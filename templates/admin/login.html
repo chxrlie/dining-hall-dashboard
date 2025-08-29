@@ -1,0 +1,87 @@
+{% extends "base.html" %} {% block title %}Admin Login - Dining Hall{% endblock
+%} {% block content %}
+<div class="login-container">
+  <h1>Admin Login</h1>
+
+  <form id="loginForm" method="post" action="/admin/login">
+    <div class="form-group">
+      <label for="username">Username:</label>
+      <input
+        type="text"
+        id="username"
+        name="username"
+        class="form-control"
+        required
+      />
+    </div>
+
+    <div class="form-group">
+      <label for="password">Password:</label>
+      <input
+        type="password"
+        id="password"
+        name="password"
+        class="form-control"
+        required
+      />
+    </div>
+
+    <button type="submit" class="btn btn-primary">Login</button>
+  </form>
+
+  {% if error %}
+  <div class="error-message">{{ error }}</div>
+  {% endif %}
+</div>
+
+<script>
+  document.getElementById("loginForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+
+    const formData = new FormData(e.target);
+    const data = {
+      username: formData.get("username"),
+      password: formData.get("password"),
+    };
+
+    try {
+      console.log("Sending login request...");
+      const response = await fetch("/admin/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(data),
+        credentials: "include", // Include cookies/session in the request
+      });
+
+      console.log("Login response status:", response.status);
+      console.log("Login response ok:", response.ok);
+
+      if (response.ok) {
+        console.log("Login successful, redirecting to /admin");
+        try {
+          // Try to parse JSON, but if it fails, still redirect
+          const responseData = await response.json();
+          console.log("Login response data:", responseData);
+        } catch (e) {
+          console.error("Error parsing JSON, but proceeding with redirect:", e);
+        }
+        // Force a hard redirect to ensure the browser handles it
+        // Add a small delay to ensure session cookie is properly set
+        setTimeout(() => {
+          window.location.replace("/admin");
+        }, 100);
+      } else {
+        const errorText = await response.text();
+        console.error("Login failed with response:", errorText);
+        alert("Login failed: " + errorText);
+      }
+    } catch (error) {
+      console.error("Login fetch error:", error);
+      alert("Login error: " + error.message);
+    }
+  });
+</script>
+
+{% endblock %}

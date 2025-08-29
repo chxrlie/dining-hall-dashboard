@@ -1,0 +1,42 @@
+[
+  {
+    "id": "123e4567-e89b-12d3-a456-426614174000",
+    "name": "Grilled Salmon",
+    "category": "Mains",
+    "description": "Fresh salmon fillet grilled to perfection with lemon butter sauce",
+    "allergens": ["Fish", "Dairy"],
+    "is_available": true
+  },
+  {
+    "id": "123e4567-e89b-12d3-a456-426614174001",
+    "name": "Vegetable Stir Fry",
+    "category": "Mains",
+    "description": "Seasonal vegetables stir-fried with tofu in a ginger soy sauce",
+    "allergens": ["Soy", "Gluten"],
+    "is_available": true
+  },
+  {
+    "id": "123e4567-e89b-12d3-a456-426614174002",
+    "name": "Caesar Salad",
+    "category": "Sides",
+    "description": "Crisp romaine lettuce with parmesan cheese and croutons",
+    "allergens": ["Dairy", "Gluten"],
+    "is_available": true
+  },
+  {
+    "id": "123e4567-e89b-12d3-a456-426614174003",
+    "name": "Chocolate Cake",
+    "category": "Desserts",
+    "description": "Rich chocolate cake with vanilla ice cream",
+    "allergens": ["Dairy", "Gluten", "Eggs"],
+    "is_available": false
+  },
+  {
+    "id": "123e4567-e89b-12d3-a456-426614174004",
+    "name": "Coffee",
+    "category": "Beverages",
+    "description": "Freshly brewed coffee",
+    "allergens": [],
+    "is_available": true
+  }
+]

@@ -1,0 +1,22 @@
+<header>
+  <nav>
+    <div class="nav-brand">
+      <img
+        src="/static/images/logo-white-text.png"
+        alt="Dining Hall Dashboard"
+        height="40"
+      />
+    </div>
+    <div class="nav-links">
+      <a href="/menu">Public View</a>
+      {% if session.user_id %}
+      <a href="/admin">Admin Dashboard</a>
+      <form action="/admin/logout" method="post">
+        <button type="submit" class="btn btn-error">Logout</button>
+      </form>
+      {% else %}
+      <a href="/admin/login">Admin Login</a>
+      {% endif %}
+    </div>
+  </nav>
+</header>
