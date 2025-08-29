@@ -253,7 +253,7 @@ pub async fn admin_dashboard(
     println!("DEBUG: admin_dashboard handler called");
     
     // Check authentication
-    let user_id = require_auth(&session).await.map_err(|e| {
+    let _user_id = require_auth(&session).await.map_err(|e| {
         println!("DEBUG: Authentication failed in admin_dashboard: {}", e);
         ApiErrorType::Validation(format!("Authentication required: {}", e))
     })?;
@@ -295,9 +295,17 @@ pub async fn menu_page(
     let menu_items = storage.get_menu_items()
         .map_err(ApiErrorType::Storage)?;
     
+    // Get notices and filter for active ones
+    let notices = storage.get_notices()
+        .map_err(ApiErrorType::Storage)?;
+    let active_notices: Vec<&Notice> = notices.iter()
+        .filter(|notice| notice.is_active)
+        .collect();
+    
     // Prepare context for template
     let mut context = tera::Context::new();
     context.insert("menu_items", &menu_items);
+    context.insert("notices", &active_notices);
     
     // Render the template
     let rendered = tera.render("menu.html", &context)

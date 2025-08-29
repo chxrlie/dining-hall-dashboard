@@ -615,6 +615,51 @@ table tr:hover {
   font-weight: 600;
 }
 
+/* Notices */
+.notices-section {
+  background: var(--color-info-light);
+  border-radius: var(--border-radius-md);
+  padding: var(--spacing-md);
+  margin-bottom: var(--spacing-lg);
+  box-shadow: var(--shadow-sm);
+}
+
+.notices-section h2 {
+  color: var(--color-info-dark);
+  margin-top: 0;
+  border-bottom: 2px solid var(--color-info);
+  padding-bottom: var(--spacing-xs);
+  margin-bottom: var(--spacing-md);
+}
+
+.notice-item {
+  background: var(--color-neutral-0);
+  border-radius: var(--border-radius-sm);
+  padding: var(--spacing-md);
+  margin-bottom: var(--spacing-md);
+  box-shadow: var(--shadow-sm);
+}
+
+.notice-item:last-child {
+  margin-bottom: 0;
+}
+
+.notice-item h3 {
+  color: var(--color-info);
+  margin-top: 0;
+  margin-bottom: var(--spacing-xs);
+}
+
+.notice-item p {
+  margin-bottom: var(--spacing-xs);
+  color: var(--color-neutral-700);
+}
+
+.notice-item small {
+  color: var(--color-neutral-500);
+  font-style: italic;
+}
+
 /* Admin Dashboard */
 .admin-dashboard h1 {
   color: var(--color-primary);
