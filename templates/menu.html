@@ -2,6 +2,20 @@
  endblock %} {% block content %}
 <div class="menu-page">
   <h1>Our Menu</h1>
+  
+  {% if notices %}
+  <div class="notices-section">
+    <h2>Important Notices</h2>
+    {% for notice in notices %}
+    <div class="notice-item">
+      <h3>{{ notice.title }}</h3>
+      <p>{{ notice.content }}</p>
+      <small>Posted: {{ notice.created_at | date(format="%B %d, %Y at %I:%M %p") }}</small>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+  
   <div class="menu-categories">
     {% if menu_items %}
       {% set current_category = "" %}
