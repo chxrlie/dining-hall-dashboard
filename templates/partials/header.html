@@ -8,14 +8,14 @@
       />
     </div>
     <div class="nav-links">
-      <a href="/menu">Public View</a>
+      <a href="/menu"></a>
       {% if session.user_id %}
-      <a href="/admin">Admin Dashboard</a>
+      <a href="/admin">Settings</a>
       <form action="/admin/logout" method="post">
         <button type="submit" class="btn btn-error">Logout</button>
       </form>
       {% else %}
-      <a href="/admin/login">Admin Login</a>
+      <a href="/admin/login">Login</a>
       {% endif %}
     </div>
   </nav>
