@@ -24,7 +24,13 @@ async fn main() -> Result<(), Box<dyn Error>> {
     println!("DEBUG: About to call JsonStorage::new()");
 
     // Initialize storage with file paths
-    let storage = JsonStorage::new("data/menu_items.json", "data/notices.json", "data/admin_users.json")?;
+    let storage = JsonStorage::new(
+        "data/menu_items.json",
+        "data/notices.json",
+        "data/admin_users.json",
+        "data/menu_presets.json",
+        "data/menu_schedules.json",
+    )?;
     println!("DEBUG: JsonStorage::new() completed successfully");
     println!("Storage initialized successfully!");
 
@@ -91,6 +97,20 @@ async fn main() -> Result<(), Box<dyn Error>> {
             .route("/admin/logout", web::post().to(auth::logout_handler))
             // Admin dashboard route
             .route("/admin", web::get().to(handlers::admin_dashboard))
+            // Menu presets routes
+            .route("/api/presets", web::get().to(handlers::list_menu_presets))
+            .route("/api/presets", web::post().to(handlers::create_menu_preset))
+            .route("/api/presets/{id}", web::get().to(handlers::get_menu_preset))
+            .route("/api/presets/{id}", web::put().to(handlers::update_menu_preset))
+            .route("/api/presets/{id}", web::delete().to(handlers::delete_menu_preset))
+            // Menu schedules routes
+            .route("/api/schedules", web::get().to(handlers::list_menu_schedules))
+            .route("/api/schedules", web::post().to(handlers::create_menu_schedule))
+            .route("/api/schedules/{id}", web::get().to(handlers::get_menu_schedule))
+            .route("/api/schedules/{id}", web::put().to(handlers::update_menu_schedule))
+            .route("/api/schedules/{id}", web::delete().to(handlers::delete_menu_schedule))
+            .route("/api/schedules/upcoming", web::get().to(handlers::get_upcoming_schedules))
+            .route("/api/schedules/validate", web::post().to(handlers::validate_schedule))
             // Serve static files
             .service(Files::new("/static", "./static").show_files_listing())
             // Public menu page
