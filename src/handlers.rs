@@ -105,8 +105,14 @@ pub struct UpdateMenuScheduleRequest {
 
 #[derive(Debug, Deserialize)]
 pub struct ValidateScheduleRequest {
+    pub preset_id: Option<uuid::Uuid>,
+    pub name: Option<String>,
+    pub description: Option<String>,
     pub start_time: chrono::DateTime<chrono::Utc>,
     pub end_time: chrono::DateTime<chrono::Utc>,
+    pub recurrence: Option<String>,
+    pub status: Option<String>,
+    pub schedule_id: Option<Uuid>, // For update validation
 }
 
 // Menu Items Handlers
@@ -724,17 +730,90 @@ pub async fn validate_schedule(
         ApiErrorType::Validation(format!("Authentication required: {}", e))
     })?;
     
+    // Validate that end time is after start time
+    if validation_data.end_time <= validation_data.start_time {
+        return Err(ApiErrorType::Validation(
+            "End time must be after start time".to_string()
+        ));
+    }
+    
+    // Validate preset exists if provided
+    if let Some(preset_id) = validation_data.preset_id {
+        let presets = storage.get_menu_presets()
+            .map_err(ApiErrorType::Storage)?;
+        
+        if !presets.iter().any(|preset| preset.id == preset_id) {
+            return Err(ApiErrorType::Validation(
+                format!("Menu preset with id {} not found", preset_id)
+            ));
+        }
+    }
+    
+    // Validate name if provided
+    if let Some(name) = &validation_data.name {
+        if name.trim().is_empty() {
+            return Err(ApiErrorType::Validation(
+                "Schedule name cannot be empty".to_string()
+            ));
+        }
+    }
+    
+    // Validate description if provided
+    if let Some(description) = &validation_data.description {
+        if description.trim().is_empty() {
+            return Err(ApiErrorType::Validation(
+                "Schedule description cannot be empty".to_string()
+            ));
+        }
+    }
+    
+    // Validate recurrence if provided
+    if let Some(recurrence) = &validation_data.recurrence {
+        match recurrence.as_str() {
+            "Daily" | "Weekly" | "Monthly" | "Custom" => {},
+            _ => return Err(ApiErrorType::Validation(
+                "Invalid recurrence value".to_string()
+            )),
+        }
+    }
+    
+    // Validate status if provided
+    if let Some(status) = &validation_data.status {
+        match status.as_str() {
+            "Active" | "Inactive" | "Pending" => {},
+            _ => return Err(ApiErrorType::Validation(
+                "Invalid status value".to_string()
+            )),
+        }
+    }
+    
     // Check for schedule conflicts
     let existing_schedules = storage.get_menu_schedules()
         .map_err(ApiErrorType::Storage)?;
     
     let mut conflicts = Vec::new();
+    let schedule_id = validation_data.schedule_id;
     
     for schedule in existing_schedules {
+        // Skip the schedule being updated
+        if let Some(id) = schedule_id {
+            if schedule.id == id {
+                continue;
+            }
+        }
+        
+        // Check for time overlap
         if (schedule.start_time <= validation_data.start_time && schedule.end_time >= validation_data.start_time) ||
            (schedule.start_time <= validation_data.end_time && schedule.end_time >= validation_data.end_time) ||
            (schedule.start_time >= validation_data.start_time && schedule.end_time <= validation_data.end_time) {
-            conflicts.push(schedule.id);
+            // If preset_id is provided, only check conflicts with schedules that use the same preset
+            if let Some(preset_id) = validation_data.preset_id {
+                if schedule.preset_id == preset_id {
+                    conflicts.push(schedule.id);
+                }
+            } else {
+                conflicts.push(schedule.id);
+            }
         }
     }
 
@@ -742,11 +821,18 @@ pub async fn validate_schedule(
     struct ValidationResponse {
         is_valid: bool,
         conflicts: Vec<Uuid>,
+        message: Option<String>,
     }
 
+    let has_conflicts = !conflicts.is_empty();
     let response = ValidationResponse {
-        is_valid: conflicts.is_empty(),
+        is_valid: !has_conflicts,
         conflicts,
+        message: if has_conflicts {
+            Some("Schedule conflicts with existing schedules".to_string())
+        } else {
+            None
+        },
     };
 
     Ok(HttpResponse::Ok().json(response))
@@ -779,5 +865,47 @@ pub async fn menu_page(
     let rendered = tera.render("menu.html", &context)
         .map_err(|e| ApiErrorType::Validation(format!("Template error: {}", e)))?;
 
+    Ok(HttpResponse::Ok().content_type("text/html").body(rendered))
+}
+
+// Menu Schedules Page Handler
+pub async fn menu_schedules_page(
+    storage: web::Data<JsonStorage>,
+    session: actix_session::Session,
+    tera: web::Data<Tera>,
+) -> Result<HttpResponse, ApiErrorType> {
+    println!("DEBUG: menu_schedules_page handler called");
+    
+    // Check authentication
+    let _user_id = require_auth(&session).await.map_err(|e| {
+        println!("DEBUG: Authentication failed in menu_schedules_page: {}", e);
+        ApiErrorType::Validation(format!("Authentication required: {}", e))
+    })?;
+    
+    // Get menu presets for the dropdown
+    let presets = storage.get_menu_presets()
+        .map_err(ApiErrorType::Storage)?;
+    
+    // Get menu schedules
+    let schedules = storage.get_menu_schedules()
+        .map_err(ApiErrorType::Storage)?;
+    
+    // Prepare context for template
+    let mut context = tera::Context::new();
+    context.insert("presets", &presets);
+    context.insert("schedules", &schedules);
+    
+    // Add session data to template context
+    if let Ok(Some(username)) = session.get::<String>("username") {
+        context.insert("session", &serde_json::json!({
+            "username": username,
+            "user_id": session.get::<Uuid>("user_id").ok().flatten()
+        }));
+    }
+    
+    // Render the template
+    let rendered = tera.render("admin/schedules.html", &context)
+        .map_err(|e| ApiErrorType::Validation(format!("Template error: {}", e)))?;
+    
     Ok(HttpResponse::Ok().content_type("text/html").body(rendered))
 }

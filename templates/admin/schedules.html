@@ -1,0 +1,810 @@
+{% extends "base.html" %} {% block title %}Menu Schedules - Admin Dashboard -
+Dining Hall{% endblock %} {% block content %}
+<div class="admin-section">
+  <h2>Menu Schedules</h2>
+
+  <!-- Calendar/Timeline View -->
+  <div class="schedule-calendar" id="scheduleCalendar">
+    <h3>Schedule Timeline</h3>
+    <div id="timelineContainer" class="timeline-container">
+      <!-- Timeline will be populated by JavaScript -->
+    </div>
+  </div>
+
+  <!-- Create New Schedule Button -->
+  <button
+    id="createScheduleBtn"
+    class="btn btn-primary"
+    aria-label="Create new menu schedule"
+  >
+    Create New Schedule
+  </button>
+
+  <!-- Schedules Table -->
+  <div class="table-container">
+    <table class="items-table" aria-label="Menu schedules table">
+      <thead>
+        <tr>
+          <th scope="col">Name</th>
+          <th scope="col">Preset</th>
+          <th scope="col">Start Time</th>
+          <th scope="col">End Time</th>
+          <th scope="col">Recurrence</th>
+          <th scope="col">Status</th>
+          <th scope="col">Actions</th>
+        </tr>
+      </thead>
+      <tbody id="schedulesTableBody">
+        <!-- Schedules will be populated by JavaScript -->
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Edit Schedule Modal -->
+<div
+  id="editScheduleModal"
+  class="modal"
+  style="display: none"
+  role="dialog"
+  aria-labelledby="modalTitle"
+  aria-modal="true"
+>
+  <div class="modal-content">
+    <h3 id="modalTitle">Create New Schedule</h3>
+    <form id="editScheduleForm">
+      <input type="hidden" id="scheduleId" name="id" value="" />
+      <div class="form-group">
+        <label for="scheduleName">Name:</label>
+        <input
+          type="text"
+          id="scheduleName"
+          name="name"
+          class="form-control"
+          required
+          aria-required="true"
+        />
+      </div>
+      <div class="form-group">
+        <label for="scheduleDescription">Description:</label>
+        <textarea
+          id="scheduleDescription"
+          name="description"
+          class="form-control"
+          required
+          aria-required="true"
+        ></textarea>
+      </div>
+      <div class="form-group">
+        <label for="schedulePreset">Menu Preset:</label>
+        <select
+          id="schedulePreset"
+          name="preset_id"
+          class="form-control"
+          required
+          aria-required="true"
+        >
+          <!-- Options will be populated by JavaScript -->
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="scheduleStartTime">Start Time:</label>
+        <input
+          type="datetime-local"
+          id="scheduleStartTime"
+          name="start_time"
+          class="form-control"
+          required
+          aria-required="true"
+        />
+      </div>
+      <div class="form-group">
+        <label for="scheduleEndTime">End Time:</label>
+        <input
+          type="datetime-local"
+          id="scheduleEndTime"
+          name="end_time"
+          class="form-control"
+          required
+          aria-required="true"
+        />
+      </div>
+      <div class="form-group">
+        <label for="scheduleRecurrence">Recurrence:</label>
+        <select
+          id="scheduleRecurrence"
+          name="recurrence"
+          class="form-control"
+          required
+          aria-required="true"
+        >
+          <option value="Daily">Daily</option>
+          <option value="Weekly">Weekly</option>
+          <option value="Monthly">Monthly</option>
+          <option value="Custom">Once</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="scheduleStatus">Status:</label>
+        <select
+          id="scheduleStatus"
+          name="status"
+          class="form-control"
+          required
+          aria-required="true"
+        >
+          <option value="Active">Active</option>
+          <option value="Inactive">Inactive</option>
+          <option value="Pending">Pending</option>
+        </select>
+      </div>
+      <div class="form-actions">
+        <button
+          type="button"
+          id="cancelScheduleBtn"
+          class="btn btn-secondary"
+          aria-label="Cancel and close dialog"
+        >
+          Cancel
+        </button>
+        <button
+          type="submit"
+          class="btn btn-primary"
+          aria-label="Save schedule"
+        >
+          Save Schedule
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+  // Global variables
+  let schedules = [];
+  let presets = [];
+
+  // DOM Elements
+  const schedulesTableBody = document.getElementById("schedulesTableBody");
+  const editScheduleModal = document.getElementById("editScheduleModal");
+  const editScheduleForm = document.getElementById("editScheduleForm");
+  const createScheduleBtn = document.getElementById("createScheduleBtn");
+  const cancelScheduleBtn = document.getElementById("cancelScheduleBtn");
+  const modalTitle = document.getElementById("modalTitle");
+  const timelineContainer = document.getElementById("timelineContainer");
+
+  // Initialize the page
+  document.addEventListener("DOMContentLoaded", async function () {
+    try {
+      // Load presets and schedules
+      await loadPresets();
+      await loadSchedules();
+
+      // Render the schedules table and timeline
+      renderSchedulesTable();
+      renderScheduleTimeline();
+
+      // Add event listeners
+      createScheduleBtn.addEventListener("click", openCreateModal);
+      cancelScheduleBtn.addEventListener("click", closeEditModal);
+      editScheduleForm.addEventListener("submit", handleScheduleFormSubmit);
+
+      // Add real-time validation listeners
+      document
+        .getElementById("scheduleStartTime")
+        .addEventListener("change", handleTimeChange);
+      document
+        .getElementById("scheduleEndTime")
+        .addEventListener("change", handleTimeChange);
+      document
+        .getElementById("schedulePreset")
+        .addEventListener("change", handlePresetChange);
+    } catch (error) {
+      console.error("Error initializing page:", error);
+      alert("Error loading data: " + error.message);
+    }
+  });
+
+  // Handle real-time validation when time fields change
+  async function handleTimeChange() {
+    const startTime = document.getElementById("scheduleStartTime").value;
+    const endTime = document.getElementById("scheduleEndTime").value;
+    const presetId = document.getElementById("schedulePreset").value;
+    const scheduleId = document.getElementById("scheduleId").value;
+
+    if (!startTime || !endTime || !presetId) {
+      return;
+    }
+
+    if (new Date(endTime) <= new Date(startTime)) {
+      alert("End time must be after start time");
+      return;
+    }
+
+    // Prepare data for validation
+    const scheduleData = {
+      preset_id: presetId,
+      start_time: new Date(startTime).toISOString(),
+      end_time: new Date(endTime).toISOString(),
+    };
+
+    try {
+      const validation = await validateSchedule(
+        scheduleData,
+        scheduleId || null
+      );
+
+      if (!validation.is_valid) {
+        alert(
+          "Schedule conflicts with existing schedules. Please adjust the timing."
+        );
+      }
+    } catch (error) {
+      console.error("Error validating schedule:", error);
+    }
+  }
+
+  // Handle real-time validation when preset changes
+  async function handlePresetChange() {
+    const startTime = document.getElementById("scheduleStartTime").value;
+    const endTime = document.getElementById("scheduleEndTime").value;
+    const presetId = document.getElementById("schedulePreset").value;
+    const scheduleId = document.getElementById("scheduleId").value;
+
+    if (!startTime || !endTime || !presetId) {
+      return;
+    }
+
+    // Prepare data for validation
+    const scheduleData = {
+      preset_id: presetId,
+      start_time: new Date(startTime).toISOString(),
+      end_time: new Date(endTime).toISOString(),
+    };
+
+    try {
+      const validation = await validateSchedule(
+        scheduleData,
+        scheduleId || null
+      );
+
+      if (!validation.is_valid) {
+        alert(
+          "Schedule conflicts with existing schedules. Please adjust the timing or select a different preset."
+        );
+      }
+    } catch (error) {
+      console.error("Error validating schedule:", error);
+    }
+  }
+
+  // Load presets from API
+  async function loadPresets() {
+    try {
+      const response = await fetch("/api/presets");
+      if (response.ok) {
+        presets = await response.json();
+      } else {
+        throw new Error("Failed to load presets");
+      }
+    } catch (error) {
+      console.error("Error loading presets:", error);
+      throw error;
+    }
+  }
+
+  // Load schedules from API
+  async function loadSchedules() {
+    try {
+      const response = await fetch("/api/schedules");
+      if (response.ok) {
+        schedules = await response.json();
+        // Sort schedules by start time
+        schedules.sort(
+          (a, b) => new Date(a.start_time) - new Date(b.start_time)
+        );
+      } else {
+        throw new Error("Failed to load schedules");
+      }
+    } catch (error) {
+      console.error("Error loading schedules:", error);
+      throw error;
+    }
+  }
+
+  // Render schedules table
+  function renderSchedulesTable() {
+    schedulesTableBody.innerHTML = "";
+
+    if (schedules.length === 0) {
+      const row = document.createElement("tr");
+      row.innerHTML =
+        '<td colspan="7" class="text-center">No schedules found</td>';
+      schedulesTableBody.appendChild(row);
+      return;
+    }
+
+    schedules.forEach((schedule) => {
+      const row = document.createElement("tr");
+
+      // Find preset name
+      const preset = presets.find((p) => p.id === schedule.preset_id);
+      const presetName = preset ? preset.name : "Unknown Preset";
+
+      row.innerHTML = `
+        <td>${schedule.name}</td>
+        <td>${presetName}</td>
+        <td>${formatDateTime(schedule.start_time)}</td>
+        <td>${formatDateTime(schedule.end_time)}</td>
+        <td>${schedule.recurrence}</td>
+        <td>
+          <span class="status ${schedule.status.toLowerCase()}">${
+        schedule.status
+      }</span>
+        </td>
+        <td>
+          <button class="btn btn-secondary" onclick="editSchedule('${
+            schedule.id
+          }')">Edit</button>
+          <button class="btn btn-error" onclick="deleteSchedule('${
+            schedule.id
+          }')">Delete</button>
+        </td>
+      `;
+      schedulesTableBody.appendChild(row);
+    });
+  }
+
+  // Render schedule timeline
+  function renderScheduleTimeline() {
+    timelineContainer.innerHTML = "";
+
+    if (schedules.length === 0) {
+      timelineContainer.innerHTML =
+        "<p class='text-center'>No schedules found</p>";
+      return;
+    }
+
+    // Create timeline container
+    const timeline = document.createElement("div");
+    timeline.className = "timeline";
+
+    // Group schedules by date
+    const schedulesByDate = {};
+    schedules.forEach((schedule) => {
+      const date = schedule.start_time.split("T")[0]; // Get date part
+      if (!schedulesByDate[date]) {
+        schedulesByDate[date] = [];
+      }
+      schedulesByDate[date].push(schedule);
+    });
+
+    // Create timeline entries
+    Object.keys(schedulesByDate)
+      .sort()
+      .forEach((date) => {
+        const dateGroup = document.createElement("div");
+        dateGroup.className = "timeline-date-group";
+
+        const dateHeader = document.createElement("h4");
+        dateHeader.textContent = formatDate(date);
+        dateHeader.className = "timeline-date-header";
+        dateGroup.appendChild(dateHeader);
+
+        const scheduleList = document.createElement("ul");
+        scheduleList.className = "timeline-schedule-list";
+
+        schedulesByDate[date].forEach((schedule) => {
+          const listItem = document.createElement("li");
+          listItem.className = "timeline-schedule-item";
+
+          // Find preset name
+          const preset = presets.find((p) => p.id === schedule.preset_id);
+          const presetName = preset ? preset.name : "Unknown Preset";
+
+          listItem.innerHTML = `
+          <div class="timeline-schedule-time">${formatTime(
+            schedule.start_time
+          )}</div>
+          <div class="timeline-schedule-content">
+            <div class="timeline-schedule-name">${schedule.name}</div>
+            <div class="timeline-schedule-preset">${presetName}</div>
+            <div class="timeline-schedule-recurrence">${
+              schedule.recurrence
+            }</div>
+            <div class="timeline-schedule-status status ${schedule.status.toLowerCase()}">${
+            schedule.status
+          }</div>
+          </div>
+        `;
+          scheduleList.appendChild(listItem);
+        });
+
+        dateGroup.appendChild(scheduleList);
+        timeline.appendChild(dateGroup);
+      });
+
+    timelineContainer.appendChild(timeline);
+  }
+
+  // Format date for display
+  function formatDate(dateString) {
+    const options = {
+      weekday: "long",
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    };
+    return new Date(dateString).toLocaleDateString(undefined, options);
+  }
+
+  // Format date and time for display
+  function formatDateTime(dateTimeString) {
+    const options = {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    };
+    return new Date(dateTimeString).toLocaleDateString(undefined, options);
+  }
+
+  // Format time for display
+  function formatTime(dateTimeString) {
+    const options = { hour: "2-digit", minute: "2-digit" };
+    return new Date(dateTimeString).toLocaleTimeString(undefined, options);
+  }
+
+  // Open create schedule modal
+  function openCreateModal() {
+    // Reset form
+    editScheduleForm.reset();
+    document.getElementById("scheduleId").value = "";
+    modalTitle.textContent = "Create New Schedule";
+
+    // Populate preset dropdown
+    populatePresetDropdown();
+
+    // Set default times (current time + 1 hour for start, + 2 hours for end)
+    const now = new Date();
+    const startTime = new Date(now.getTime() + 60 * 60 * 1000);
+    const endTime = new Date(now.getTime() + 2 * 60 * 60 * 1000);
+
+    document.getElementById("scheduleStartTime").value =
+      formatDateTimeForInput(startTime);
+    document.getElementById("scheduleEndTime").value =
+      formatDateTimeForInput(endTime);
+
+    // Show modal
+    editScheduleModal.style.display = "flex";
+
+    // Focus on the first input field
+    document.getElementById("scheduleName").focus();
+  }
+
+  // Edit schedule
+  function editSchedule(id) {
+    const schedule = schedules.find((s) => s.id === id);
+    if (!schedule) {
+      alert("Schedule not found");
+      return;
+    }
+
+    // Fill form with schedule data
+    document.getElementById("scheduleId").value = schedule.id;
+    document.getElementById("scheduleName").value = schedule.name;
+    document.getElementById("scheduleDescription").value = schedule.description;
+    document.getElementById("scheduleStartTime").value = formatDateTimeForInput(
+      new Date(schedule.start_time)
+    );
+    document.getElementById("scheduleEndTime").value = formatDateTimeForInput(
+      new Date(schedule.end_time)
+    );
+    document.getElementById("scheduleRecurrence").value = schedule.recurrence;
+    document.getElementById("scheduleStatus").value = schedule.status;
+    modalTitle.textContent = "Edit Schedule";
+
+    // Populate preset dropdown and select current preset
+    populatePresetDropdown(schedule.preset_id);
+
+    // Show modal
+    editScheduleModal.style.display = "flex";
+
+    // Focus on the first input field
+    document.getElementById("scheduleName").focus();
+  }
+
+  // Populate preset dropdown
+  function populatePresetDropdown(selectedPresetId = null) {
+    const presetSelect = document.getElementById("schedulePreset");
+    presetSelect.innerHTML = "";
+
+    if (presets.length === 0) {
+      const option = document.createElement("option");
+      option.value = "";
+      option.textContent = "No presets available";
+      presetSelect.appendChild(option);
+      return;
+    }
+
+    presets.forEach((preset) => {
+      const option = document.createElement("option");
+      option.value = preset.id;
+      option.textContent = preset.name;
+      if (selectedPresetId && preset.id === selectedPresetId) {
+        option.selected = true;
+      }
+      presetSelect.appendChild(option);
+    });
+  }
+
+  // Format date for datetime-local input
+  function formatDateTimeForInput(date) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    const hours = String(date.getHours()).padStart(2, "0");
+    const minutes = String(date.getMinutes()).padStart(2, "0");
+
+    return `${year}-${month}-${day}T${hours}:${minutes}`;
+  }
+
+  // Close edit modal
+  function closeEditModal() {
+    editScheduleModal.style.display = "none";
+  }
+
+  // Close modal when pressing Escape key
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape" && editScheduleModal.style.display === "flex") {
+      closeEditModal();
+    }
+  });
+
+  // Validate schedule in real-time
+  async function validateSchedule(scheduleData, scheduleId = null) {
+    try {
+      const response = await fetch("/api/schedules/validate", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+        body: JSON.stringify({
+          ...scheduleData,
+          schedule_id: scheduleId,
+        }),
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        return result;
+      } else {
+        const errorText = await response.text();
+        throw new Error(errorText);
+      }
+    } catch (error) {
+      console.error("Error validating schedule:", error);
+      throw error;
+    }
+  }
+
+  // Handle schedule form submission
+  async function handleScheduleFormSubmit(e) {
+    e.preventDefault();
+
+    // Get form data
+    const formData = new FormData(editScheduleForm);
+    const scheduleId = formData.get("id");
+    const name = formData.get("name");
+    const description = formData.get("description");
+    const presetId = formData.get("preset_id");
+    const startTime = formData.get("start_time");
+    const endTime = formData.get("end_time");
+    const recurrence = formData.get("recurrence");
+    const status = formData.get("status");
+
+    // Validate required fields
+    if (!name || !description || !presetId || !startTime || !endTime) {
+      alert("Please fill in all required fields");
+      return;
+    }
+
+    // Validate that end time is after start time
+    if (new Date(endTime) <= new Date(startTime)) {
+      alert("End time must be after start time");
+      return;
+    }
+
+    // Prepare data for API
+    const scheduleData = {
+      name: name,
+      description: description,
+      preset_id: presetId,
+      start_time: new Date(startTime).toISOString(),
+      end_time: new Date(endTime).toISOString(),
+      recurrence: recurrence,
+      status: status,
+    };
+
+    try {
+      // Validate schedule before saving
+      const validation = await validateSchedule(
+        scheduleData,
+        scheduleId || null
+      );
+
+      if (!validation.is_valid) {
+        alert(
+          "Schedule conflicts with existing schedules. Please adjust the timing."
+        );
+        return;
+      }
+
+      let response;
+
+      if (scheduleId) {
+        // Update existing schedule
+        response = await fetch(`/api/schedules/${scheduleId}`, {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          credentials: "include",
+          body: JSON.stringify(scheduleData),
+        });
+      } else {
+        // Create new schedule
+        response = await fetch("/api/schedules", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          credentials: "include",
+          body: JSON.stringify(scheduleData),
+        });
+      }
+
+      if (response.ok) {
+        alert(
+          scheduleId
+            ? "Schedule updated successfully"
+            : "Schedule created successfully"
+        );
+        closeEditModal();
+        await loadSchedules();
+        renderSchedulesTable();
+        renderScheduleTimeline();
+      } else {
+        const errorText = await response.text();
+        throw new Error(errorText);
+      }
+    } catch (error) {
+      console.error("Error saving schedule:", error);
+      alert("Error saving schedule: " + error.message);
+    }
+  }
+
+  // Delete schedule
+  async function deleteSchedule(id) {
+    if (!confirm("Are you sure you want to delete this schedule?")) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/schedules/${id}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+
+      if (response.ok) {
+        alert("Schedule deleted successfully");
+        await loadSchedules();
+        renderSchedulesTable();
+        renderScheduleTimeline();
+      } else {
+        const errorText = await response.text();
+        throw new Error(errorText);
+      }
+    } catch (error) {
+      console.error("Error deleting schedule:", error);
+      alert("Error deleting schedule: " + error.message);
+    }
+  }
+</script>
+
+<style>
+  /* Schedule Timeline Styles */
+  .timeline-container {
+    background: var(--color-neutral-0);
+    border-radius: var(--border-radius-md);
+    padding: var(--spacing-md);
+    margin-bottom: var(--spacing-lg);
+    box-shadow: var(--shadow-sm);
+  }
+
+  .timeline-date-header {
+    color: var(--color-primary);
+    border-bottom: 2px solid var(--color-primary-light);
+    padding-bottom: var(--spacing-xs);
+    margin-bottom: var(--spacing-md);
+  }
+
+  .timeline-schedule-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+
+  .timeline-schedule-item {
+    display: flex;
+    padding: var(--spacing-sm) 0;
+    border-bottom: 1px solid var(--color-neutral-300);
+  }
+
+  .timeline-schedule-item:last-child {
+    border-bottom: none;
+  }
+
+  .timeline-schedule-time {
+    flex: 0 0 80px;
+    font-weight: bold;
+    color: var(--color-neutral-700);
+  }
+
+  .timeline-schedule-content {
+    flex: 1;
+  }
+
+  .timeline-schedule-name {
+    font-weight: bold;
+    margin-bottom: var(--spacing-xs);
+  }
+
+  .timeline-schedule-preset {
+    color: var(--color-neutral-600);
+    margin-bottom: var(--spacing-xs);
+  }
+
+  .timeline-schedule-recurrence {
+    font-size: var(--font-size-sm);
+    color: var(--color-neutral-500);
+    margin-bottom: var(--spacing-xs);
+  }
+
+  .timeline-schedule-status {
+    display: inline-block;
+    padding: var(--spacing-xxs) var(--spacing-xs);
+    border-radius: var(--border-radius-sm);
+    font-size: var(--font-size-xs);
+    font-weight: 600;
+  }
+
+  .timeline-schedule-status.active {
+    background-color: var(--color-success-light);
+    color: var(--color-neutral-0);
+  }
+
+  .timeline-schedule-status.inactive {
+    background-color: var(--color-neutral-500);
+    color: var(--color-neutral-0);
+  }
+
+  .timeline-schedule-status.pending {
+    background-color: var(--color-warning-light);
+    color: var(--color-neutral-0);
+  }
+
+  @media (max-width: 47.9375rem) {
+    .timeline-schedule-item {
+      flex-direction: column;
+    }
+
+    .timeline-schedule-time {
+      flex: 0 0 auto;
+      margin-bottom: var(--spacing-xs);
+    }
+  }
+</style>
+{% endblock %}

@@ -782,6 +782,30 @@ table tr:hover {
 
 .bg-info {
   background-color: var(--color-info-light);
+  /* Status Indicators */
+  .status {
+    display: inline-block;
+    padding: var(--spacing-xxs) var(--spacing-xs);
+    border-radius: var(--border-radius-sm);
+    font-size: var(--font-size-xs);
+    font-weight: 600;
+    text-transform: uppercase;
+  }
+
+  .status.active {
+    background-color: var(--color-success-light);
+    color: var(--color-neutral-0);
+  }
+
+  .status.inactive {
+    background-color: var(--color-neutral-500);
+    color: var(--color-neutral-0);
+  }
+
+  .status.pending {
+    background-color: var(--color-warning-light);
+    color: var(--color-neutral-0);
+  }
 }
 
 .sr-only {

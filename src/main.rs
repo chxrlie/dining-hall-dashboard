@@ -1,6 +1,7 @@
 mod auth;
 mod handlers;
 mod storage;
+mod scheduler;
 
 use std::error::Error;
 use actix_web::{web, App, HttpServer};
@@ -13,6 +14,7 @@ use actix_web::cookie::Key;
 use storage::JsonStorage;
 use tera::Tera;
 use crate::auth::create_default_admin;
+use crate::scheduler::start_scheduler;
 
 #[actix_web::main]
 async fn main() -> Result<(), Box<dyn Error>> {
@@ -43,6 +45,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
     println!("DEBUG: About to call create_default_admin()");
     create_default_admin(storage_data.clone()).await?;
     println!("DEBUG: create_default_admin() completed successfully");
+    
+    // Start the scheduler service
+    println!("DEBUG: Starting scheduler service");
+    start_scheduler(storage_data.clone()).await;
+    println!("DEBUG: Scheduler service started");
 
     // Initialize Tera templates
     println!("DEBUG: Initializing Tera templates");
@@ -111,6 +118,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
             .route("/api/schedules/{id}", web::delete().to(handlers::delete_menu_schedule))
             .route("/api/schedules/upcoming", web::get().to(handlers::get_upcoming_schedules))
             .route("/api/schedules/validate", web::post().to(handlers::validate_schedule))
+            // Menu schedules page
+            .route("/admin/schedules", web::get().to(handlers::menu_schedules_page))
             // Serve static files
             .service(Files::new("/static", "./static").show_files_listing())
             // Public menu page
