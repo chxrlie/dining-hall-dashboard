@@ -1,41 +1,118 @@
 [
   {
-    "id": "123e4567-e89b-12d3-a456-426614174000",
-    "name": "Grilled Salmon",
+    "id": "11111111-1111-1111-1111-111111111111",
+    "name": "Grilled Chicken Breast",
     "category": "Mains",
-    "description": "Fresh salmon fillet grilled to perfection with lemon butter sauce",
-    "allergens": ["Fish", "Dairy"],
+    "description": "Tender grilled chicken breast with herbs and spices",
+    "allergens": [
+      "Soy"
+    ],
     "is_available": true
   },
   {
-    "id": "123e4567-e89b-12d3-a456-426614174001",
+    "id": "22222222-2222-2222-2222-222222222222",
     "name": "Vegetable Stir Fry",
     "category": "Mains",
-    "description": "Seasonal vegetables stir-fried with tofu in a ginger soy sauce",
-    "allergens": ["Soy", "Gluten"],
+    "description": "Fresh seasonal vegetables stir-fried with tofu",
+    "allergens": [
+      "Soy",
+      "Gluten"
+    ],
     "is_available": true
   },
   {
-    "id": "123e4567-e89b-12d3-a456-426614174002",
+    "id": "33333333-3333-3333-3333-333333333333",
+    "name": "Beef Lasagna",
+    "category": "Mains",
+    "description": "Classic beef lasagna with layers of pasta and cheese",
+    "allergens": [
+      "Gluten",
+      "Dairy"
+    ],
+    "is_available": true
+  },
+  {
+    "id": "44444444-4444-4444-4444-444444444444",
     "name": "Caesar Salad",
     "category": "Sides",
-    "description": "Crisp romaine lettuce with parmesan cheese and croutons",
-    "allergens": ["Dairy", "Gluten"],
+    "description": "Crisp romaine lettuce with Caesar dressing and croutons",
+    "allergens": [
+      "Gluten",
+      "Dairy",
+      "Eggs"
+    ],
     "is_available": true
   },
   {
-    "id": "123e4567-e89b-12d3-a456-426614174003",
+    "id": "55555555-5555-5555-5555-555555555555",
+    "name": "Garlic Bread",
+    "category": "Sides",
+    "description": "Toasted bread with garlic butter",
+    "allergens": [
+      "Gluten",
+      "Dairy"
+    ],
+    "is_available": true
+  },
+  {
+    "id": "66666666-6666-6666-6666-666666666666",
+    "name": "French Fries",
+    "category": "Sides",
+    "description": "Crispy golden french fries with salt",
+    "allergens": [],
+    "is_available": true
+  },
+  {
+    "id": "77777777-7777-7777-7777-777777777777",
     "name": "Chocolate Cake",
     "category": "Desserts",
-    "description": "Rich chocolate cake with vanilla ice cream",
-    "allergens": ["Dairy", "Gluten", "Eggs"],
+    "description": "Rich chocolate cake with chocolate frosting",
+    "allergens": [
+      "Gluten",
+      "Dairy",
+      "Eggs"
+    ],
+    "is_available": true
+  },
+  {
+    "id": "88888888-8888-8888-8888-888888888888",
+    "name": "Fruit Salad",
+    "category": "Desserts",
+    "description": "Seasonal fresh fruit salad",
+    "allergens": [],
+    "is_available": true
+  },
+  {
+    "id": "99999999-9999-9999-9999-999999999999",
+    "name": "Ice Cream",
+    "category": "Desserts",
+    "description": "Vanilla ice cream with choice of toppings",
+    "allergens": [
+      "Dairy"
+    ],
     "is_available": false
   },
   {
-    "id": "123e4567-e89b-12d3-a456-426614174004",
+    "id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+    "name": "Fresh Orange Juice",
+    "category": "Beverages",
+    "description": "Freshly squeezed orange juice",
+    "allergens": [],
+    "is_available": true
+  },
+  {
+    "id": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
     "name": "Coffee",
     "category": "Beverages",
     "description": "Freshly brewed coffee",
+    "allergens": [],
+    "is_available": true
+  },
+  {
+    "id": "cccccccc-cccc-cccc-cccc-cccccccccccc",
+    "name": "Sparkling Water",
+    "category": "Beverages",
+    "description": "Refreshing sparkling water with lemon",
     "allergens": [],
     "is_available": true
   }

@@ -1,0 +1,43 @@
+[
+  {
+    "id": "10000000-0000-0000-0000-000000000001",
+    "name": "Healthy Choices",
+    "description": "A balanced selection of nutritious meals and fresh ingredients for health-conscious diners",
+    "menu_item_ids": [
+      "22222222-2222-2222-2222-222222222222",
+      "44444444-4444-4444-4444-444444444444",
+      "88888888-8888-8888-8888-888888888888",
+      "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+      "cccccccc-cccc-cccc-cccc-cccccccccccc"
+    ],
+    "created_at": "2025-08-30T20:00:00Z",
+    "updated_at": "2025-08-31T17:08:25.162936195Z"
+  },
+  {
+    "id": "10000000-0000-0000-0000-000000000002",
+    "name": "Comfort Food",
+    "description": "Hearty and satisfying dishes that warm the soul",
+    "menu_item_ids": [
+      "33333333-3333-3333-3333-333333333333",
+      "55555555-5555-5555-5555-555555555555",
+      "66666666-6666-6666-6666-666666666666",
+      "77777777-7777-7777-7777-777777777777",
+      "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+    ],
+    "created_at": "2025-08-30T20:00:00Z",
+    "updated_at": "2025-08-30T20:00:00Z"
+  },
+  {
+    "id": "fead6fef-9dd3-4b79-b1c5-ad8a944c8563",
+    "name": "Vegetarian Special",
+    "description": "A delicious vegetarian meal selection",
+    "menu_item_ids": [
+      "22222222-2222-2222-2222-222222222222",
+      "44444444-4444-4444-4444-444444444444",
+      "88888888-8888-8888-8888-888888888888",
+      "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+    ],
+    "created_at": "2025-08-31T17:08:04.562245852Z",
+    "updated_at": "2025-08-31T17:08:04.562252966Z"
+  }
+]

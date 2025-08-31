@@ -4,7 +4,7 @@ use thiserror::Error;
 use uuid::Uuid;
 use tera::Tera;
 
-use crate::storage::{JsonStorage, MenuItem, Notice, StorageError};
+use crate::storage::{JsonStorage, MenuItem, Notice, StorageError, MenuPreset, MenuSchedule, ScheduleRecurrence, ScheduleStatus};
 use crate::auth::require_auth;
 
 #[derive(Debug, Serialize)]
@@ -65,6 +65,54 @@ pub struct UpdateNoticeRequest {
     pub title: Option<String>,
     pub content: Option<String>,
     pub is_active: Option<bool>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct CreateMenuPresetRequest {
+    pub name: String,
+    pub description: String,
+    pub menu_item_ids: Vec<uuid::Uuid>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct UpdateMenuPresetRequest {
+    pub name: Option<String>,
+    pub description: Option<String>,
+    pub menu_item_ids: Option<Vec<uuid::Uuid>>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct CreateMenuScheduleRequest {
+    pub preset_id: uuid::Uuid,
+    pub name: String,
+    pub description: String,
+    pub start_time: chrono::DateTime<chrono::Utc>,
+    pub end_time: chrono::DateTime<chrono::Utc>,
+    pub recurrence: String, // Will be converted to ScheduleRecurrence enum
+    pub status: String,     // Will be converted to ScheduleStatus enum
+}
+
+#[derive(Debug, Deserialize)]
+pub struct UpdateMenuScheduleRequest {
+    pub preset_id: Option<uuid::Uuid>,
+    pub name: Option<String>,
+    pub description: Option<String>,
+    pub start_time: Option<chrono::DateTime<chrono::Utc>>,
+    pub end_time: Option<chrono::DateTime<chrono::Utc>>,
+    pub recurrence: Option<String>, // Will be converted to ScheduleRecurrence enum
+    pub status: Option<String>,     // Will be converted to ScheduleStatus enum
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ValidateScheduleRequest {
+    pub preset_id: Option<uuid::Uuid>,
+    pub name: Option<String>,
+    pub description: Option<String>,
+    pub start_time: chrono::DateTime<chrono::Utc>,
+    pub end_time: chrono::DateTime<chrono::Utc>,
+    pub recurrence: Option<String>,
+    pub status: Option<String>,
+    pub schedule_id: Option<Uuid>, // For update validation
 }
 
 // Menu Items Handlers
@@ -284,6 +332,512 @@ pub async fn admin_dashboard(
     Ok(HttpResponse::Ok().content_type("text/html").body(rendered))
 }
 
+// Menu Presets Handlers
+
+pub async fn list_menu_presets(
+    storage: web::Data<JsonStorage>,
+    session: actix_session::Session,
+) -> Result<impl Responder, ApiErrorType> {
+    // Check authentication
+    let _user_id = require_auth(&session).await.map_err(|e| {
+        ApiErrorType::Validation(format!("Authentication required: {}", e))
+    })?;
+    
+    let presets = storage.get_menu_presets()
+        .map_err(ApiErrorType::Storage)?;
+    Ok(HttpResponse::Ok().json(presets))
+}
+
+pub async fn create_menu_preset(
+    storage: web::Data<JsonStorage>,
+    session: actix_session::Session,
+    preset_data: web::Json<CreateMenuPresetRequest>,
+) -> Result<impl Responder, ApiErrorType> {
+    // Check authentication
+    let _user_id = require_auth(&session).await.map_err(|e| {
+        ApiErrorType::Validation(format!("Authentication required: {}", e))
+    })?;
+    
+    use chrono::Utc;
+
+    // Validate that menu item IDs exist
+    let menu_items = storage.get_menu_items()
+        .map_err(ApiErrorType::Storage)?;
+    
+    for item_id in &preset_data.menu_item_ids {
+        if !menu_items.iter().any(|item| &item.id == item_id) {
+            return Err(ApiErrorType::Validation(
+                format!("Menu item with id {} not found", item_id)
+            ));
+        }
+    }
+
+    let new_preset = MenuPreset {
+        id: Uuid::new_v4(),
+        name: preset_data.name.clone(),
+        description: preset_data.description.clone(),
+        menu_item_ids: preset_data.menu_item_ids.clone(),
+        created_at: Utc::now(),
+        updated_at: Utc::now(),
+    };
+
+    storage.add_menu_preset(new_preset.clone())
+        .map_err(ApiErrorType::Storage)?;
+
+    Ok(HttpResponse::Created().json(new_preset))
+}
+
+pub async fn get_menu_preset(
+    storage: web::Data<JsonStorage>,
+    session: actix_session::Session,
+    path: web::Path<Uuid>,
+) -> Result<impl Responder, ApiErrorType> {
+    // Check authentication
+    let _user_id = require_auth(&session).await.map_err(|e| {
+        ApiErrorType::Validation(format!("Authentication required: {}", e))
+    })?;
+    
+    let preset_id = path.into_inner();
+    
+    let presets = storage.get_menu_presets()
+        .map_err(ApiErrorType::Storage)?;
+    
+    let preset = presets.into_iter()
+        .find(|p| p.id == preset_id)
+        .ok_or_else(|| ApiErrorType::NotFound(
+            format!("Menu preset with id {} not found", preset_id)
+        ))?;
+
+    Ok(HttpResponse::Ok().json(preset))
+}
+
+pub async fn update_menu_preset(
+    storage: web::Data<JsonStorage>,
+    session: actix_session::Session,
+    path: web::Path<Uuid>,
+    update_data: web::Json<UpdateMenuPresetRequest>,
+) -> Result<impl Responder, ApiErrorType> {
+    // Check authentication
+    let _user_id = require_auth(&session).await.map_err(|e| {
+        ApiErrorType::Validation(format!("Authentication required: {}", e))
+    })?;
+    
+    use chrono::Utc;
+    
+    let preset_id = path.into_inner();
+    
+    // Get existing preset
+    let presets = storage.get_menu_presets()
+        .map_err(ApiErrorType::Storage)?;
+    
+    let mut existing_preset = presets.into_iter()
+        .find(|p| p.id == preset_id)
+        .ok_or_else(|| ApiErrorType::NotFound(
+            format!("Menu preset with id {} not found", preset_id)
+        ))?;
+
+    // Validate menu item IDs if provided
+    if let Some(menu_item_ids) = &update_data.menu_item_ids {
+        let menu_items = storage.get_menu_items()
+            .map_err(ApiErrorType::Storage)?;
+        
+        for item_id in menu_item_ids {
+            if !menu_items.iter().any(|item| &item.id == item_id) {
+                return Err(ApiErrorType::Validation(
+                    format!("Menu item with id {} not found", item_id)
+                ));
+            }
+        }
+        existing_preset.menu_item_ids = menu_item_ids.clone();
+    }
+
+    // Update fields
+    if let Some(name) = &update_data.name {
+        existing_preset.name = name.clone();
+    }
+    if let Some(description) = &update_data.description {
+        existing_preset.description = description.clone();
+    }
+    existing_preset.updated_at = Utc::now();
+
+    storage.update_menu_preset(preset_id, existing_preset.clone())
+        .map_err(ApiErrorType::Storage)?;
+
+    Ok(HttpResponse::Ok().json(existing_preset))
+}
+
+pub async fn delete_menu_preset(
+    storage: web::Data<JsonStorage>,
+    session: actix_session::Session,
+    path: web::Path<Uuid>,
+) -> Result<impl Responder, ApiErrorType> {
+    // Check authentication
+    let _user_id = require_auth(&session).await.map_err(|e| {
+        ApiErrorType::Validation(format!("Authentication required: {}", e))
+    })?;
+    
+    let preset_id = path.into_inner();
+    
+    storage.delete_menu_preset(preset_id)
+        .map_err(ApiErrorType::Storage)?;
+
+    Ok(HttpResponse::NoContent())
+}
+
+// Menu Schedules Handlers
+
+pub async fn list_menu_schedules(
+    storage: web::Data<JsonStorage>,
+    session: actix_session::Session,
+) -> Result<impl Responder, ApiErrorType> {
+    // Check authentication
+    let _user_id = require_auth(&session).await.map_err(|e| {
+        ApiErrorType::Validation(format!("Authentication required: {}", e))
+    })?;
+    
+    let schedules = storage.get_menu_schedules()
+        .map_err(ApiErrorType::Storage)?;
+    Ok(HttpResponse::Ok().json(schedules))
+}
+
+pub async fn create_menu_schedule(
+    storage: web::Data<JsonStorage>,
+    session: actix_session::Session,
+    schedule_data: web::Json<CreateMenuScheduleRequest>,
+) -> Result<impl Responder, ApiErrorType> {
+    // Check authentication
+    let _user_id = require_auth(&session).await.map_err(|e| {
+        ApiErrorType::Validation(format!("Authentication required: {}", e))
+    })?;
+    
+    use chrono::Utc;
+
+    // Validate that preset exists
+    let presets = storage.get_menu_presets()
+        .map_err(ApiErrorType::Storage)?;
+    
+    if !presets.iter().any(|preset| preset.id == schedule_data.preset_id) {
+        return Err(ApiErrorType::Validation(
+            format!("Menu preset with id {} not found", schedule_data.preset_id)
+        ));
+    }
+
+    // Convert recurrence string to enum
+    let recurrence = match schedule_data.recurrence.as_str() {
+        "Daily" => ScheduleRecurrence::Daily,
+        "Weekly" => ScheduleRecurrence::Weekly,
+        "Monthly" => ScheduleRecurrence::Monthly,
+        "Custom" => ScheduleRecurrence::Custom,
+        _ => return Err(ApiErrorType::Validation("Invalid recurrence value".to_string())),
+    };
+
+    // Convert status string to enum
+    let status = match schedule_data.status.as_str() {
+        "Active" => ScheduleStatus::Active,
+        "Inactive" => ScheduleStatus::Inactive,
+        "Pending" => ScheduleStatus::Pending,
+        _ => return Err(ApiErrorType::Validation("Invalid status value".to_string())),
+    };
+
+    // Check for schedule conflicts
+    let existing_schedules = storage.get_menu_schedules()
+        .map_err(ApiErrorType::Storage)?;
+    
+    for schedule in existing_schedules {
+        if schedule.preset_id == schedule_data.preset_id &&
+           ((schedule.start_time <= schedule_data.start_time && schedule.end_time >= schedule_data.start_time) ||
+            (schedule.start_time <= schedule_data.end_time && schedule.end_time >= schedule_data.end_time) ||
+            (schedule.start_time >= schedule_data.start_time && schedule.end_time <= schedule_data.end_time)) {
+            return Err(ApiErrorType::Validation(
+                format!("Schedule conflict with existing schedule id {}", schedule.id)
+            ));
+        }
+    }
+
+    let new_schedule = MenuSchedule {
+        id: Uuid::new_v4(),
+        preset_id: schedule_data.preset_id,
+        name: schedule_data.name.clone(),
+        description: schedule_data.description.clone(),
+        start_time: schedule_data.start_time,
+        end_time: schedule_data.end_time,
+        recurrence,
+        status,
+        created_at: Utc::now(),
+        updated_at: Utc::now(),
+    };
+
+    storage.add_menu_schedule(new_schedule.clone())
+        .map_err(ApiErrorType::Storage)?;
+
+    Ok(HttpResponse::Created().json(new_schedule))
+}
+
+pub async fn get_menu_schedule(
+    storage: web::Data<JsonStorage>,
+    session: actix_session::Session,
+    path: web::Path<Uuid>,
+) -> Result<impl Responder, ApiErrorType> {
+    // Check authentication
+    let _user_id = require_auth(&session).await.map_err(|e| {
+        ApiErrorType::Validation(format!("Authentication required: {}", e))
+    })?;
+    
+    let schedule_id = path.into_inner();
+    
+    let schedules = storage.get_menu_schedules()
+        .map_err(ApiErrorType::Storage)?;
+    
+    let schedule = schedules.into_iter()
+        .find(|s| s.id == schedule_id)
+        .ok_or_else(|| ApiErrorType::NotFound(
+            format!("Menu schedule with id {} not found", schedule_id)
+        ))?;
+
+    Ok(HttpResponse::Ok().json(schedule))
+}
+
+pub async fn update_menu_schedule(
+    storage: web::Data<JsonStorage>,
+    session: actix_session::Session,
+    path: web::Path<Uuid>,
+    update_data: web::Json<UpdateMenuScheduleRequest>,
+) -> Result<impl Responder, ApiErrorType> {
+    // Check authentication
+    let _user_id = require_auth(&session).await.map_err(|e| {
+        ApiErrorType::Validation(format!("Authentication required: {}", e))
+    })?;
+    
+    use chrono::Utc;
+    
+    let schedule_id = path.into_inner();
+    
+    // Get existing schedule
+    let schedules = storage.get_menu_schedules()
+        .map_err(ApiErrorType::Storage)?;
+    
+    let mut existing_schedule = schedules.into_iter()
+        .find(|s| s.id == schedule_id)
+        .ok_or_else(|| ApiErrorType::NotFound(
+            format!("Menu schedule with id {} not found", schedule_id)
+        ))?;
+
+    // Validate preset_id if provided
+    if let Some(preset_id) = update_data.preset_id {
+        let presets = storage.get_menu_presets()
+            .map_err(ApiErrorType::Storage)?;
+        
+        if !presets.iter().any(|preset| preset.id == preset_id) {
+            return Err(ApiErrorType::Validation(
+                format!("Menu preset with id {} not found", preset_id)
+            ));
+        }
+        existing_schedule.preset_id = preset_id;
+    }
+
+    // Update fields
+    if let Some(name) = &update_data.name {
+        existing_schedule.name = name.clone();
+    }
+    if let Some(description) = &update_data.description {
+        existing_schedule.description = description.clone();
+    }
+    if let Some(start_time) = update_data.start_time {
+        existing_schedule.start_time = start_time;
+    }
+    if let Some(end_time) = update_data.end_time {
+        existing_schedule.end_time = end_time;
+    }
+    
+    // Convert recurrence string to enum if provided
+    if let Some(recurrence_str) = &update_data.recurrence {
+        let recurrence = match recurrence_str.as_str() {
+            "Daily" => ScheduleRecurrence::Daily,
+            "Weekly" => ScheduleRecurrence::Weekly,
+            "Monthly" => ScheduleRecurrence::Monthly,
+            "Custom" => ScheduleRecurrence::Custom,
+            _ => return Err(ApiErrorType::Validation("Invalid recurrence value".to_string())),
+        };
+        existing_schedule.recurrence = recurrence;
+    }
+    
+    // Convert status string to enum if provided
+    if let Some(status_str) = &update_data.status {
+        let status = match status_str.as_str() {
+            "Active" => ScheduleStatus::Active,
+            "Inactive" => ScheduleStatus::Inactive,
+            "Pending" => ScheduleStatus::Pending,
+            _ => return Err(ApiErrorType::Validation("Invalid status value".to_string())),
+        };
+        existing_schedule.status = status;
+    }
+    
+    existing_schedule.updated_at = Utc::now();
+
+    storage.update_menu_schedule(schedule_id, existing_schedule.clone())
+        .map_err(ApiErrorType::Storage)?;
+
+    Ok(HttpResponse::Ok().json(existing_schedule))
+}
+
+pub async fn delete_menu_schedule(
+    storage: web::Data<JsonStorage>,
+    session: actix_session::Session,
+    path: web::Path<Uuid>,
+) -> Result<impl Responder, ApiErrorType> {
+    // Check authentication
+    let _user_id = require_auth(&session).await.map_err(|e| {
+        ApiErrorType::Validation(format!("Authentication required: {}", e))
+    })?;
+    
+    let schedule_id = path.into_inner();
+    
+    storage.delete_menu_schedule(schedule_id)
+        .map_err(ApiErrorType::Storage)?;
+
+    Ok(HttpResponse::NoContent())
+}
+
+pub async fn get_upcoming_schedules(
+    storage: web::Data<JsonStorage>,
+    session: actix_session::Session,
+) -> Result<impl Responder, ApiErrorType> {
+    // Check authentication
+    let _user_id = require_auth(&session).await.map_err(|e| {
+        ApiErrorType::Validation(format!("Authentication required: {}", e))
+    })?;
+    
+    use chrono::Utc;
+    
+    let schedules = storage.get_menu_schedules()
+        .map_err(ApiErrorType::Storage)?;
+    
+    // Filter for upcoming schedules (start time is in the future)
+    let upcoming_schedules: Vec<MenuSchedule> = schedules.into_iter()
+        .filter(|schedule| schedule.start_time > Utc::now())
+        .collect();
+
+    Ok(HttpResponse::Ok().json(upcoming_schedules))
+}
+
+pub async fn validate_schedule(
+    storage: web::Data<JsonStorage>,
+    session: actix_session::Session,
+    validation_data: web::Json<ValidateScheduleRequest>,
+) -> Result<impl Responder, ApiErrorType> {
+    // Check authentication
+    let _user_id = require_auth(&session).await.map_err(|e| {
+        ApiErrorType::Validation(format!("Authentication required: {}", e))
+    })?;
+    
+    // Validate that end time is after start time
+    if validation_data.end_time <= validation_data.start_time {
+        return Err(ApiErrorType::Validation(
+            "End time must be after start time".to_string()
+        ));
+    }
+    
+    // Validate preset exists if provided
+    if let Some(preset_id) = validation_data.preset_id {
+        let presets = storage.get_menu_presets()
+            .map_err(ApiErrorType::Storage)?;
+        
+        if !presets.iter().any(|preset| preset.id == preset_id) {
+            return Err(ApiErrorType::Validation(
+                format!("Menu preset with id {} not found", preset_id)
+            ));
+        }
+    }
+    
+    // Validate name if provided
+    if let Some(name) = &validation_data.name {
+        if name.trim().is_empty() {
+            return Err(ApiErrorType::Validation(
+                "Schedule name cannot be empty".to_string()
+            ));
+        }
+    }
+    
+    // Validate description if provided
+    if let Some(description) = &validation_data.description {
+        if description.trim().is_empty() {
+            return Err(ApiErrorType::Validation(
+                "Schedule description cannot be empty".to_string()
+            ));
+        }
+    }
+    
+    // Validate recurrence if provided
+    if let Some(recurrence) = &validation_data.recurrence {
+        match recurrence.as_str() {
+            "Daily" | "Weekly" | "Monthly" | "Custom" => {},
+            _ => return Err(ApiErrorType::Validation(
+                "Invalid recurrence value".to_string()
+            )),
+        }
+    }
+    
+    // Validate status if provided
+    if let Some(status) = &validation_data.status {
+        match status.as_str() {
+            "Active" | "Inactive" | "Pending" => {},
+            _ => return Err(ApiErrorType::Validation(
+                "Invalid status value".to_string()
+            )),
+        }
+    }
+    
+    // Check for schedule conflicts
+    let existing_schedules = storage.get_menu_schedules()
+        .map_err(ApiErrorType::Storage)?;
+    
+    let mut conflicts = Vec::new();
+    let schedule_id = validation_data.schedule_id;
+    
+    for schedule in existing_schedules {
+        // Skip the schedule being updated
+        if let Some(id) = schedule_id {
+            if schedule.id == id {
+                continue;
+            }
+        }
+        
+        // Check for time overlap
+        if (schedule.start_time <= validation_data.start_time && schedule.end_time >= validation_data.start_time) ||
+           (schedule.start_time <= validation_data.end_time && schedule.end_time >= validation_data.end_time) ||
+           (schedule.start_time >= validation_data.start_time && schedule.end_time <= validation_data.end_time) {
+            // If preset_id is provided, only check conflicts with schedules that use the same preset
+            if let Some(preset_id) = validation_data.preset_id {
+                if schedule.preset_id == preset_id {
+                    conflicts.push(schedule.id);
+                }
+            } else {
+                conflicts.push(schedule.id);
+            }
+        }
+    }
+
+    #[derive(Debug, Serialize)]
+    struct ValidationResponse {
+        is_valid: bool,
+        conflicts: Vec<Uuid>,
+        message: Option<String>,
+    }
+
+    let has_conflicts = !conflicts.is_empty();
+    let response = ValidationResponse {
+        is_valid: !has_conflicts,
+        conflicts,
+        message: if has_conflicts {
+            Some("Schedule conflicts with existing schedules".to_string())
+        } else {
+            None
+        },
+    };
+
+    Ok(HttpResponse::Ok().json(response))
+}
+
 // Public Menu Display Handler
 pub async fn menu_page(
     storage: web::Data<JsonStorage>,
@@ -311,5 +865,89 @@ pub async fn menu_page(
     let rendered = tera.render("menu.html", &context)
         .map_err(|e| ApiErrorType::Validation(format!("Template error: {}", e)))?;
 
+    Ok(HttpResponse::Ok().content_type("text/html").body(rendered))
+}
+
+// Menu Schedules Page Handler
+pub async fn menu_schedules_page(
+    storage: web::Data<JsonStorage>,
+    session: actix_session::Session,
+    tera: web::Data<Tera>,
+) -> Result<HttpResponse, ApiErrorType> {
+    println!("DEBUG: menu_schedules_page handler called");
+    
+    // Check authentication
+    let _user_id = require_auth(&session).await.map_err(|e| {
+        println!("DEBUG: Authentication failed in menu_schedules_page: {}", e);
+        ApiErrorType::Validation(format!("Authentication required: {}", e))
+    })?;
+    
+    // Get menu presets for the dropdown
+    let presets = storage.get_menu_presets()
+        .map_err(ApiErrorType::Storage)?;
+    
+    // Get menu schedules
+    let schedules = storage.get_menu_schedules()
+        .map_err(ApiErrorType::Storage)?;
+    
+    // Prepare context for template
+    let mut context = tera::Context::new();
+    context.insert("presets", &presets);
+    context.insert("schedules", &schedules);
+    
+    // Add session data to template context
+    if let Ok(Some(username)) = session.get::<String>("username") {
+        context.insert("session", &serde_json::json!({
+            "username": username,
+            "user_id": session.get::<Uuid>("user_id").ok().flatten()
+        }));
+    }
+    
+    // Render the template
+    let rendered = tera.render("admin/schedules.html", &context)
+        .map_err(|e| ApiErrorType::Validation(format!("Template error: {}", e)))?;
+    
+    Ok(HttpResponse::Ok().content_type("text/html").body(rendered))
+}
+
+// Menu Presets Page Handler
+pub async fn menu_presets_page(
+    storage: web::Data<JsonStorage>,
+    session: actix_session::Session,
+    tera: web::Data<Tera>,
+) -> Result<HttpResponse, ApiErrorType> {
+    println!("DEBUG: menu_presets_page handler called");
+    
+    // Check authentication
+    let _user_id = require_auth(&session).await.map_err(|e| {
+        println!("DEBUG: Authentication failed in menu_presets_page: {}", e);
+        ApiErrorType::Validation(format!("Authentication required: {}", e))
+    })?;
+    
+    // Get menu items for the dropdown
+    let menu_items = storage.get_menu_items()
+        .map_err(ApiErrorType::Storage)?;
+    
+    // Get menu presets
+    let presets = storage.get_menu_presets()
+        .map_err(ApiErrorType::Storage)?;
+    
+    // Prepare context for template
+    let mut context = tera::Context::new();
+    context.insert("menu_items", &menu_items);
+    context.insert("presets", &presets);
+    
+    // Add session data to template context
+    if let Ok(Some(username)) = session.get::<String>("username") {
+        context.insert("session", &serde_json::json!({
+            "username": username,
+            "user_id": session.get::<Uuid>("user_id").ok().flatten()
+        }));
+    }
+    
+    // Render the template
+    let rendered = tera.render("admin/presets.html", &context)
+        .map_err(|e| ApiErrorType::Validation(format!("Template error: {}", e)))?;
+    
     Ok(HttpResponse::Ok().content_type("text/html").body(rendered))
 }
