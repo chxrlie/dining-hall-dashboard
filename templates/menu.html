@@ -19,7 +19,7 @@
   <div class="menu-categories">
     {% if menu_items %}
       {% set current_category = "" %}
-      {% for item in menu_items | sort(attribute="category") %}
+      {% for item in menu_items %}
         {% if item.category != current_category %}
           {% if current_category != "" %}
             </div> <!-- Close menu-items -->
