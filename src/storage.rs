@@ -605,37 +605,4 @@ impl JsonStorage {
             )))
         }
     }
-    
-    /// Check if a new schedule conflicts with existing schedules
-    ///
-    /// # Arguments
-    /// * `new_schedule` - The schedule to check for conflicts
-    /// * `existing_schedules` - The list of existing schedules to check against
-    ///
-    /// # Returns
-    /// * `Ok(())` if no conflicts are found
-    /// * `Err(StorageError::Io)` with a descriptive message if conflicts are found
-    pub fn check_schedule_conflicts(&self, new_schedule: &MenuSchedule, existing_schedules: &[MenuSchedule]) -> Result<(), StorageError> {
-        for existing in existing_schedules {
-            // Skip checking against itself
-            if existing.id == new_schedule.id {
-                continue;
-            }
-            
-            // Check for time overlap
-            if (existing.start_time <= new_schedule.start_time && existing.end_time >= new_schedule.start_time) ||
-               (existing.start_time <= new_schedule.end_time && existing.end_time >= new_schedule.end_time) ||
-               (existing.start_time >= new_schedule.start_time && existing.end_time <= new_schedule.end_time) {
-                // For recurring schedules, we might want to implement more complex logic
-                // For now, we'll just check for direct time conflicts
-                if existing.preset_id == new_schedule.preset_id {
-                    return Err(StorageError::Io(io::Error::new(
-                        io::ErrorKind::InvalidInput,
-                        format!("Schedule conflicts with existing schedule '{}'", existing.name),
-                    )));
-                }
-            }
-        }
-        Ok(())
-    }
 }

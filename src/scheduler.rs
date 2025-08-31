@@ -133,7 +133,7 @@ fn execute_schedule(storage: &Data<JsonStorage>, mut schedule: MenuSchedule) -> 
 }
 
 /// Calculate the next occurrence of a recurring schedule
-fn calculate_next_occurrence(schedule: &MenuSchedule, now: chrono::DateTime<Utc>) -> Option<chrono::DateTime<Utc>> {
+fn calculate_next_occurrence(schedule: &MenuSchedule, _now: chrono::DateTime<Utc>) -> Option<chrono::DateTime<Utc>> {
     match schedule.recurrence {
         ScheduleRecurrence::Daily => {
             // Add one day

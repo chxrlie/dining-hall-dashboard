@@ -12,7 +12,6 @@ use thiserror::Error;
 use uuid::Uuid;
 
 use crate::storage::{JsonStorage, AdminUser, StorageError};
-use crate::handlers::ApiErrorType;
 
 #[derive(Debug, Deserialize)]
 pub struct LoginRequest {
