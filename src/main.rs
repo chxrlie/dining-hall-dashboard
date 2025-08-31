@@ -120,6 +120,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
             .route("/api/schedules/validate", web::post().to(handlers::validate_schedule))
             // Menu schedules page
             .route("/admin/schedules", web::get().to(handlers::menu_schedules_page))
+            // Menu presets page
+            .route("/admin/presets", web::get().to(handlers::menu_presets_page))
             // Serve static files
             .service(Files::new("/static", "./static").show_files_listing())
             // Public menu page

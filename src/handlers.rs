@@ -909,3 +909,45 @@ pub async fn menu_schedules_page(
     
     Ok(HttpResponse::Ok().content_type("text/html").body(rendered))
 }
+
+// Menu Presets Page Handler
+pub async fn menu_presets_page(
+    storage: web::Data<JsonStorage>,
+    session: actix_session::Session,
+    tera: web::Data<Tera>,
+) -> Result<HttpResponse, ApiErrorType> {
+    println!("DEBUG: menu_presets_page handler called");
+    
+    // Check authentication
+    let _user_id = require_auth(&session).await.map_err(|e| {
+        println!("DEBUG: Authentication failed in menu_presets_page: {}", e);
+        ApiErrorType::Validation(format!("Authentication required: {}", e))
+    })?;
+    
+    // Get menu items for the dropdown
+    let menu_items = storage.get_menu_items()
+        .map_err(ApiErrorType::Storage)?;
+    
+    // Get menu presets
+    let presets = storage.get_menu_presets()
+        .map_err(ApiErrorType::Storage)?;
+    
+    // Prepare context for template
+    let mut context = tera::Context::new();
+    context.insert("menu_items", &menu_items);
+    context.insert("presets", &presets);
+    
+    // Add session data to template context
+    if let Ok(Some(username)) = session.get::<String>("username") {
+        context.insert("session", &serde_json::json!({
+            "username": username,
+            "user_id": session.get::<Uuid>("user_id").ok().flatten()
+        }));
+    }
+    
+    // Render the template
+    let rendered = tera.render("admin/presets.html", &context)
+        .map_err(|e| ApiErrorType::Validation(format!("Template error: {}", e)))?;
+    
+    Ok(HttpResponse::Ok().content_type("text/html").body(rendered))
+}

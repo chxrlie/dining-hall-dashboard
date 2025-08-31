@@ -4,7 +4,9 @@
     "name": "Grilled Chicken Breast",
     "category": "Mains",
     "description": "Tender grilled chicken breast with herbs and spices",
-    "allergens": ["Soy"],
+    "allergens": [
+      "Soy"
+    ],
     "is_available": true
   },
   {
@@ -12,7 +14,10 @@
     "name": "Vegetable Stir Fry",
     "category": "Mains",
     "description": "Fresh seasonal vegetables stir-fried with tofu",
-    "allergens": ["Soy", "Gluten"],
+    "allergens": [
+      "Soy",
+      "Gluten"
+    ],
     "is_available": true
   },
   {
@@ -20,7 +25,10 @@
     "name": "Beef Lasagna",
     "category": "Mains",
     "description": "Classic beef lasagna with layers of pasta and cheese",
-    "allergens": ["Gluten", "Dairy"],
+    "allergens": [
+      "Gluten",
+      "Dairy"
+    ],
     "is_available": true
   },
   {
@@ -28,7 +36,11 @@
     "name": "Caesar Salad",
     "category": "Sides",
     "description": "Crisp romaine lettuce with Caesar dressing and croutons",
-    "allergens": ["Gluten", "Dairy", "Eggs"],
+    "allergens": [
+      "Gluten",
+      "Dairy",
+      "Eggs"
+    ],
     "is_available": true
   },
   {
@@ -36,7 +48,10 @@
     "name": "Garlic Bread",
     "category": "Sides",
     "description": "Toasted bread with garlic butter",
-    "allergens": ["Gluten", "Dairy"],
+    "allergens": [
+      "Gluten",
+      "Dairy"
+    ],
     "is_available": true
   },
   {
@@ -52,7 +67,11 @@
     "name": "Chocolate Cake",
     "category": "Desserts",
     "description": "Rich chocolate cake with chocolate frosting",
-    "allergens": ["Gluten", "Dairy", "Eggs"],
+    "allergens": [
+      "Gluten",
+      "Dairy",
+      "Eggs"
+    ],
     "is_available": true
   },
   {
@@ -68,8 +87,10 @@
     "name": "Ice Cream",
     "category": "Desserts",
     "description": "Vanilla ice cream with choice of toppings",
-    "allergens": ["Dairy"],
-    "is_available": true
+    "allergens": [
+      "Dairy"
+    ],
+    "is_available": false
   },
   {
     "id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
