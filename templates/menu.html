@@ -40,8 +40,6 @@
           <p class="allergens">
             <strong>Allergens:</strong> {{ item.allergens | join(sep=", ") }}
           </p>
-          {% endif %} {% if not item.is_available %}
-          <span class="unavailable">Currently unavailable</span>
           {% endif %}
         </div>
       {% endfor %}

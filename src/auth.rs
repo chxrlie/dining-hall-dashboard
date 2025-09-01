@@ -12,8 +12,7 @@ use thiserror::Error;
 use uuid::Uuid;
 
 use crate::storage::{JsonStorage, AdminUser, StorageError};
-use crate::handlers::ApiErrorType;
-
+use crate::error_handler::{AppError, ResultExt};
 #[derive(Debug, Deserialize)]
 pub struct LoginRequest {
     pub username: String,
@@ -28,33 +27,23 @@ pub struct LoginResponse {
 
 #[derive(Debug, Error)]
 pub enum AuthError {
-    #[error("Invalid username or password")]
-    InvalidCredentials,
     #[error("Storage error: {0}")]
     Storage(#[from] StorageError),
     #[error("Password hashing error")]
     HashError,
-    #[error("Session error")]
-    SessionError,
-    #[error("Task join error: {0}")]
-    JoinError(String),
 }
 
-impl actix_web::ResponseError for AuthError {
-    fn error_response(&self) -> HttpResponse {
-        let status = match self {
-            AuthError::InvalidCredentials => actix_web::http::StatusCode::UNAUTHORIZED,
-            AuthError::Storage(_) => actix_web::http::StatusCode::INTERNAL_SERVER_ERROR,
-            AuthError::HashError => actix_web::http::StatusCode::INTERNAL_SERVER_ERROR,
-            AuthError::SessionError => actix_web::http::StatusCode::INTERNAL_SERVER_ERROR,
-            AuthError::JoinError(_) => actix_web::http::StatusCode::INTERNAL_SERVER_ERROR,
-        };
-        HttpResponse::build(status).json(crate::handlers::ApiError { error: self.to_string() })
+impl From<AuthError> for AppError {
+    fn from(auth_error: AuthError) -> Self {
+        match auth_error {
+            AuthError::Storage(storage_error) => AppError::Storage(storage_error.to_string()),
+            AuthError::HashError => AppError::Auth("Password hashing error".to_string()),
+        }
     }
 }
 
 /// Hash a password using Argon2 with secure parameters
-pub fn hash_password(password: &str) -> Result<String, AuthError> {
+pub fn hash_password(password: &str) -> Result<String, AppError> {
     let salt = SaltString::generate(&mut OsRng);
     let argon2 = Argon2::default();
     let password_hash = argon2
@@ -65,7 +54,7 @@ pub fn hash_password(password: &str) -> Result<String, AuthError> {
 }
 
 /// Verify a password against a hash
-pub fn verify_password(password: &str, hash: &str) -> Result<bool, AuthError> {
+pub fn verify_password(password: &str, hash: &str) -> Result<bool, AppError> {
     let parsed_hash = PasswordHash::new(hash).map_err(|_| AuthError::HashError)?;
     let result = Argon2::default().verify_password(password.as_bytes(), &parsed_hash);
     Ok(result.is_ok())
@@ -76,43 +65,43 @@ pub async fn login_handler(
     storage: web::Data<JsonStorage>,
     session: Session,
     login_data: web::Json<LoginRequest>,
-) -> Result<impl Responder, AuthError> {
+) -> Result<impl Responder, AppError> {
     // Find user by username
     let user = storage.get_ref().get_admin_user_by_username(&login_data.username)
-        .map_err(AuthError::Storage)?
-        .ok_or(AuthError::InvalidCredentials)?;
+        .map_storage_err()?
+        .ok_or(AppError::Auth("Invalid username or password".to_string()))?;
 
     // Verify password
     if !verify_password(&login_data.password, &user.password_hash)? {
-        return Err(AuthError::InvalidCredentials);
+        return Err(AppError::Auth("Invalid username or password".to_string()));
     }
 
     // Set session
-    println!("DEBUG: Setting session for user: {}", user.username);
+    log::debug!("Setting session for user: {}", user.username);
     session.insert("user_id", user.id)
         .map_err(|e| {
-            println!("DEBUG: Error setting user_id in session: {:?}", e);
-            AuthError::SessionError
+            log::debug!("Error setting user_id in session: {:?}", e);
+            AppError::Auth("Session error".to_string())
         })?;
     session.insert("username", user.username)
         .map_err(|e| {
-            println!("DEBUG: Error setting username in session: {:?}", e);
-            AuthError::SessionError
+            log::debug!("Error setting username in session: {:?}", e);
+            AppError::Auth("Session error".to_string())
         })?;
 
     session.renew();
-    println!("DEBUG: Session renewed successfully");
+    log::debug!("Session renewed successfully");
 
     // Debug: check if session values are set
     let check_user_id: Option<Uuid> = session.get("user_id").map_err(|e| {
-        println!("DEBUG: Error getting user_id for verification: {:?}", e);
-        AuthError::SessionError
+        log::debug!("Error getting user_id for verification: {:?}", e);
+        AppError::Auth("Session error".to_string())
     })?;
     let check_username: Option<String> = session.get("username").map_err(|e| {
-        println!("DEBUG: Error getting username for verification: {:?}", e);
-        AuthError::SessionError
+        log::debug!("Error getting username for verification: {:?}", e);
+        AppError::Auth("Session error".to_string())
     })?;
-    println!("DEBUG: Session verification - user_id: {:?}, username: {:?}", check_user_id, check_username);
+    log::debug!("Session verification - user_id: {:?}, username: {:?}", check_user_id, check_username);
 
     let response = HttpResponse::SeeOther()
         .insert_header(("Location", "/admin"))
@@ -121,7 +110,7 @@ pub async fn login_handler(
             user_id: user.id,
         });
 
-    println!("DEBUG: Login response prepared with redirect");
+    log::debug!("Login response prepared with redirect");
     Ok(response)
 }
 
@@ -136,39 +125,39 @@ pub async fn logout_handler(
 /// Middleware to protect admin routes
 pub async fn require_auth(
     session: &Session,
-) -> Result<Uuid, AuthError> {
-    println!("DEBUG: require_auth() called");
+) -> Result<Uuid, AppError> {
+    log::debug!("require_auth() called");
     
     let user_id_result = session.get::<Uuid>("user_id");
-    println!("DEBUG: user_id result: {:?}", user_id_result);
+    log::debug!("user_id result: {:?}", user_id_result);
     
     let user_id: Uuid = session.get("user_id")
         .map_err(|e| {
-            println!("DEBUG: Session error getting user_id: {:?}", e);
-            AuthError::SessionError
+            log::debug!("Session error getting user_id: {:?}", e);
+            AppError::Auth("Session error".to_string())
         })?
         .ok_or_else(|| {
-            println!("DEBUG: No user_id found in session");
-            AuthError::InvalidCredentials
+            log::debug!("No user_id found in session");
+            AppError::Auth("Invalid username or password".to_string())
         })?;
         
-    println!("DEBUG: User ID found: {}", user_id);
+    log::debug!("User ID found: {}", user_id);
     Ok(user_id)
 }
 
 /// Create a default admin user if none exists
-pub async fn create_default_admin(storage: web::Data<JsonStorage>) -> Result<(), AuthError> {
-    println!("DEBUG: create_default_admin() started");
+pub async fn create_default_admin(storage: web::Data<JsonStorage>) -> Result<(), AppError> {
+    log::debug!("create_default_admin() started");
     
-    println!("DEBUG: Getting admin users list");
-    let users = storage.get_ref().get_admin_users().map_err(AuthError::Storage)?;
-    println!("DEBUG: Found {} admin users", users.len());
+    log::debug!("Getting admin users list");
+    let users = storage.get_ref().get_admin_users().map_storage_err()?;
+    log::debug!("Found {} admin users", users.len());
     
     if users.is_empty() {
-        println!("DEBUG: No admin users found, creating default admin");
-        println!("DEBUG: Hashing password...");
+        log::debug!("No admin users found, creating default admin");
+        log::debug!("Hashing password...");
         let password_hash = hash_password("admin123")?;
-        println!("DEBUG: Password hashed successfully");
+        log::debug!("Password hashed successfully");
         
         let admin_user = AdminUser {
             id: Uuid::new_v4(),
@@ -176,21 +165,21 @@ pub async fn create_default_admin(storage: web::Data<JsonStorage>) -> Result<(),
             password_hash,
         };
         
-        println!("DEBUG: Adding admin user to storage on blocking thread");
+        log::debug!("Adding admin user to storage on blocking thread");
         // Move the blocking storage operation to a dedicated thread
         let storage_clone = storage.clone();
         actix_rt::task::spawn_blocking(move || {
             storage_clone.get_ref().add_admin_user(admin_user)
         })
         .await
-        .map_err(|e| AuthError::JoinError(e.to_string()))?
-        .map_err(AuthError::Storage)?;
+        .map_err(|e| AppError::Internal(e.to_string()))?
+        .map_storage_err()?;
         
-        println!("Default admin user created: username='admin', password='admin123'");
+        log::info!("Default admin user created: username='admin', password='admin123'");
     } else {
-        println!("DEBUG: Admin users already exist, skipping creation");
+        log::debug!("Admin users already exist, skipping creation");
     }
     
-    println!("DEBUG: create_default_admin() completed successfully");
+    log::debug!("create_default_admin() completed successfully");
     Ok(())
 }
