@@ -842,9 +842,12 @@ pub async fn menu_page(
 ) -> Result<HttpResponse, ApiErrorType> {
     println!("DEBUG: menu_page handler called");
     
-    // Get menu items
+    // Get menu items and filter for available ones
     let menu_items = storage.get_menu_items()
         .map_err(ApiErrorType::Storage)?;
+    let available_menu_items: Vec<&MenuItem> = menu_items.iter()
+        .filter(|item| item.is_available)
+        .collect();
     
     // Get notices and filter for active ones
     let notices = storage.get_notices()
@@ -855,7 +858,7 @@ pub async fn menu_page(
     
     // Prepare context for template
     let mut context = tera::Context::new();
-    context.insert("menu_items", &menu_items);
+    context.insert("menu_items", &available_menu_items);
     context.insert("notices", &active_notices);
     
     // Render the template

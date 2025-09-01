@@ -54,7 +54,7 @@ fn check_and_execute_schedules(storage: &Data<JsonStorage>) -> Result<(), Box<dy
                 // Execute the schedule
                 if let Err(e) = execute_schedule(storage, schedule.clone()) {
                     error!("Failed to execute schedule {}: {}", schedule.id, e);
-                    // Update schedule status to Failed
+                    // Update schedule status to Inactive
                     let mut failed_schedule = schedule.clone();
                     failed_schedule.status = ScheduleStatus::Inactive;
                     if let Err(update_err) = storage.update_menu_schedule(schedule.id, failed_schedule) {
@@ -82,18 +82,17 @@ fn execute_schedule(storage: &Data<JsonStorage>, mut schedule: MenuSchedule) -> 
         .ok_or_else(|| format!("Preset with id {} not found for schedule {}", schedule.preset_id, schedule.id))?;
     
     // Get all menu items
-    let mut menu_items = storage.get_menu_items()?;
+    let menu_items = storage.get_menu_items()?;
     
     // Update menu items based on the preset
     // Set is_available = true for items in the preset
-    // Set is_available = false for items not in the preset
-    for item in &mut menu_items {
-        item.is_available = preset.menu_item_ids.contains(&item.id);
-    }
-    
-    // Save updated menu items
+    // Leave is_available status of other items unchanged
     for item in menu_items {
-        storage.update_menu_item(item.id, item)?;
+        if preset.menu_item_ids.contains(&item.id) {
+            let mut updated_item = item.clone();
+            updated_item.is_available = true;
+            storage.update_menu_item(updated_item.id, updated_item)?;
+        }
     }
     
     // Update schedule status based on recurrence
@@ -105,24 +104,16 @@ fn execute_schedule(storage: &Data<JsonStorage>, mut schedule: MenuSchedule) -> 
                 schedule.updated_at = Utc::now();
                 // Keep status as Pending for next execution
             } else {
-                // If we can't calculate next occurrence, mark as completed
+                // If we can't calculate next occurrence, mark as inactive
                 schedule.status = ScheduleStatus::Inactive;
                 schedule.updated_at = Utc::now();
             }
         }
         ScheduleRecurrence::Custom => {
-            // For custom recurrence, we'll need more information
-            // For now, mark as inactive
+            // For custom recurrence, mark as inactive
             schedule.status = ScheduleStatus::Inactive;
             schedule.updated_at = Utc::now();
         }
-    }
-    
-    // If it was a one-time schedule (no recurrence), mark as completed
-    if matches!(schedule.recurrence, ScheduleRecurrence::Custom) &&
-       !matches!(schedule.status, ScheduleStatus::Inactive) {
-        schedule.status = ScheduleStatus::Inactive;
-        schedule.updated_at = Utc::now();
     }
     
     // Update the schedule in storage
