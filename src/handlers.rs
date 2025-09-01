@@ -1,11 +1,14 @@
-use actix_web::{web, HttpResponse, Responder};
+use actix_web::{HttpResponse, Responder, web};
 use serde::{Deserialize, Serialize};
-use uuid::Uuid;
 use tera::Tera;
+use uuid::Uuid;
 
-use crate::storage::{JsonStorage, MenuItem, Notice, MenuPreset, MenuSchedule, ScheduleRecurrence, ScheduleStatus, StorageError};
 use crate::auth::require_auth;
 use crate::error_handler::{AppError, ResultExt};
+use crate::storage::{
+    JsonStorage, MenuItem, MenuPreset, MenuSchedule, Notice, ScheduleRecurrence, ScheduleStatus,
+    StorageError,
+};
 
 #[derive(Debug, Serialize)]
 pub struct ApiError {
@@ -25,7 +28,10 @@ pub enum ApiErrorType {
 impl From<AppError> for ApiErrorType {
     fn from(app_error: AppError) -> Self {
         match app_error {
-            AppError::Storage(msg) => ApiErrorType::Storage(StorageError::Io(std::io::Error::new(std::io::ErrorKind::Other, msg))),
+            AppError::Storage(msg) => ApiErrorType::Storage(StorageError::Io(std::io::Error::new(
+                std::io::ErrorKind::Other,
+                msg,
+            ))),
             AppError::Auth(msg) => ApiErrorType::Validation(format!("Auth error: {}", msg)),
             AppError::Validation(msg) => ApiErrorType::Validation(msg),
             AppError::NotFound(msg) => ApiErrorType::NotFound(msg),
@@ -43,7 +49,9 @@ impl actix_web::ResponseError for ApiErrorType {
             ApiErrorType::NotFound(_) => actix_web::http::StatusCode::NOT_FOUND,
         };
 
-        HttpResponse::build(status).json(ApiError { error: error_message })
+        HttpResponse::build(status).json(ApiError {
+            error: error_message,
+        })
     }
 }
 
@@ -129,9 +137,10 @@ pub struct ValidateScheduleRequest {
 
 // Menu Items Handlers
 
-pub async fn list_menu_items(storage: web::Data<JsonStorage>) -> Result<impl Responder, ApiErrorType> {
-    let items = storage.get_menu_items()
-        .map_err(ApiErrorType::Storage)?;
+pub async fn list_menu_items(
+    storage: web::Data<JsonStorage>,
+) -> Result<impl Responder, ApiErrorType> {
+    let items = storage.get_menu_items().map_err(ApiErrorType::Storage)?;
     Ok(HttpResponse::Ok().json(items))
 }
 
@@ -139,7 +148,10 @@ pub async fn create_menu_item(
     storage: web::Data<JsonStorage>,
     item_data: web::Json<CreateMenuItemRequest>,
 ) -> Result<impl Responder, ApiErrorType> {
-    println!("DEBUG: create_menu_item() called with data: {:?}", item_data);
+    println!(
+        "DEBUG: create_menu_item() called with data: {:?}",
+        item_data
+    );
     // Validate category
     let category = match item_data.category.as_str() {
         "Mains" => crate::storage::MenuCategory::Mains,
@@ -159,7 +171,8 @@ pub async fn create_menu_item(
     };
 
     println!("DEBUG: About to add menu item to storage: {:?}", new_item);
-    storage.add_menu_item(new_item.clone())
+    storage
+        .add_menu_item(new_item.clone())
         .map_err(ApiErrorType::from)?;
     println!("DEBUG: Menu item added to storage successfully");
 
@@ -172,13 +185,15 @@ pub async fn update_menu_item(
     update_data: web::Json<UpdateMenuItemRequest>,
 ) -> Result<impl Responder, ApiErrorType> {
     let item_id = path.into_inner();
-    
+
     // Get existing item
-    let items = storage.get_menu_items()
-        .map_err(ApiErrorType::Storage)?;
-    let existing_item = items.iter()
+    let items = storage.get_menu_items().map_err(ApiErrorType::Storage)?;
+    let existing_item = items
+        .iter()
         .find(|item| item.id == item_id)
-        .ok_or_else(|| ApiErrorType::NotFound(format!("Menu item with id {} not found", item_id)))?;
+        .ok_or_else(|| {
+            ApiErrorType::NotFound(format!("Menu item with id {} not found", item_id))
+        })?;
 
     // Validate category if provided
     let category = if let Some(category_str) = &update_data.category {
@@ -195,14 +210,26 @@ pub async fn update_menu_item(
 
     let updated_item = MenuItem {
         id: item_id,
-        name: update_data.name.clone().unwrap_or_else(|| existing_item.name.clone()),
+        name: update_data
+            .name
+            .clone()
+            .unwrap_or_else(|| existing_item.name.clone()),
         category,
-        description: update_data.description.clone().unwrap_or_else(|| existing_item.description.clone()),
-        allergens: update_data.allergens.clone().unwrap_or_else(|| existing_item.allergens.clone()),
-        is_available: update_data.is_available.unwrap_or(existing_item.is_available),
+        description: update_data
+            .description
+            .clone()
+            .unwrap_or_else(|| existing_item.description.clone()),
+        allergens: update_data
+            .allergens
+            .clone()
+            .unwrap_or_else(|| existing_item.allergens.clone()),
+        is_available: update_data
+            .is_available
+            .unwrap_or(existing_item.is_available),
     };
 
-    storage.update_menu_item(item_id, updated_item.clone())
+    storage
+        .update_menu_item(item_id, updated_item.clone())
         .map_err(ApiErrorType::from)?;
 
     Ok(HttpResponse::Ok().json(updated_item))
@@ -213,8 +240,9 @@ pub async fn delete_menu_item(
     path: web::Path<Uuid>,
 ) -> Result<impl Responder, ApiErrorType> {
     let item_id = path.into_inner();
-    
-    storage.delete_menu_item(item_id)
+
+    storage
+        .delete_menu_item(item_id)
         .map_err(ApiErrorType::from)?;
 
     Ok(HttpResponse::NoContent())
@@ -223,8 +251,7 @@ pub async fn delete_menu_item(
 // Notices Handlers
 
 pub async fn list_notices(storage: web::Data<JsonStorage>) -> Result<impl Responder, ApiErrorType> {
-    let notices = storage.get_notices()
-        .map_err(ApiErrorType::Storage)?;
+    let notices = storage.get_notices().map_err(ApiErrorType::Storage)?;
     Ok(HttpResponse::Ok().json(notices))
 }
 
@@ -243,7 +270,8 @@ pub async fn create_notice(
         updated_at: Utc::now(),
     };
 
-    storage.add_notice(new_notice.clone())
+    storage
+        .add_notice(new_notice.clone())
         .map_err(ApiErrorType::from)?;
 
     Ok(HttpResponse::Created().json(new_notice))
@@ -255,11 +283,11 @@ pub async fn update_notice(
     update_data: web::Json<UpdateNoticeRequest>,
 ) -> Result<impl Responder, ApiErrorType> {
     let notice_id = path.into_inner();
-    
+
     // Get existing notice
-    let notices = storage.get_notices()
-        .map_err(ApiErrorType::Storage)?;
-    let existing_notice = notices.iter()
+    let notices = storage.get_notices().map_err(ApiErrorType::Storage)?;
+    let existing_notice = notices
+        .iter()
         .find(|notice| notice.id == notice_id)
         .ok_or_else(|| ApiErrorType::NotFound(format!("Notice with id {} not found", notice_id)))?;
 
@@ -267,14 +295,21 @@ pub async fn update_notice(
 
     let updated_notice = Notice {
         id: notice_id,
-        title: update_data.title.clone().unwrap_or_else(|| existing_notice.title.clone()),
-        content: update_data.content.clone().unwrap_or_else(|| existing_notice.content.clone()),
+        title: update_data
+            .title
+            .clone()
+            .unwrap_or_else(|| existing_notice.title.clone()),
+        content: update_data
+            .content
+            .clone()
+            .unwrap_or_else(|| existing_notice.content.clone()),
         is_active: update_data.is_active.unwrap_or(existing_notice.is_active),
         created_at: existing_notice.created_at,
         updated_at: Utc::now(),
     };
 
-    storage.update_notice(notice_id, updated_notice.clone())
+    storage
+        .update_notice(notice_id, updated_notice.clone())
         .map_err(ApiErrorType::from)?;
 
     Ok(HttpResponse::Ok().json(updated_notice))
@@ -285,22 +320,22 @@ pub async fn delete_notice(
     path: web::Path<Uuid>,
 ) -> Result<impl Responder, ApiErrorType> {
     let notice_id = path.into_inner();
-    
-    storage.delete_notice(notice_id)
+
+    storage
+        .delete_notice(notice_id)
         .map_err(ApiErrorType::from)?;
 
     Ok(HttpResponse::NoContent())
 }
 
 // Login page handler
-pub async fn login_page(
-    tera: web::Data<Tera>,
-) -> Result<HttpResponse, ApiErrorType> {
+pub async fn login_page(tera: web::Data<Tera>) -> Result<HttpResponse, ApiErrorType> {
     println!("DEBUG: login_page handler called");
-    
-    let rendered = tera.render("admin/login.html", &tera::Context::new())
+
+    let rendered = tera
+        .render("admin/login.html", &tera::Context::new())
         .map_err(|e| ApiErrorType::Validation(format!("Template error: {}", e)))?;
-    
+
     Ok(HttpResponse::Ok().content_type("text/html").body(rendered))
 }
 
@@ -311,7 +346,7 @@ pub async fn admin_dashboard(
     tera: web::Data<Tera>,
 ) -> Result<HttpResponse, ApiErrorType> {
     println!("DEBUG: admin_dashboard handler called");
-    
+
     // Check authentication
     let _user_id = require_auth(&session).await.map_err(|e| {
         println!("DEBUG: Authentication failed in admin_dashboard: {}", e);
@@ -319,26 +354,28 @@ pub async fn admin_dashboard(
     })?;
 
     // Get menu items and notices
-    let menu_items = storage.get_menu_items()
-        .map_err(ApiErrorType::Storage)?;
-    let notices = storage.get_notices()
-        .map_err(ApiErrorType::Storage)?;
+    let menu_items = storage.get_menu_items().map_err(ApiErrorType::Storage)?;
+    let notices = storage.get_notices().map_err(ApiErrorType::Storage)?;
 
     // Prepare context for template
     let mut context = tera::Context::new();
     context.insert("menu_items", &menu_items);
     context.insert("notices", &notices);
-    
+
     // Add session data to template context
     if let Ok(Some(username)) = session.get::<String>("username") {
-        context.insert("session", &serde_json::json!({
-            "username": username,
-            "user_id": session.get::<Uuid>("user_id").ok().flatten()
-        }));
+        context.insert(
+            "session",
+            &serde_json::json!({
+                "username": username,
+                "user_id": session.get::<Uuid>("user_id").ok().flatten()
+            }),
+        );
     }
 
     // Render the template
-    let rendered = tera.render("admin/dashboard.html", &context)
+    let rendered = tera
+        .render("admin/dashboard.html", &context)
         .map_err(|e| ApiErrorType::Validation(format!("Template error: {}", e)))?;
 
     Ok(HttpResponse::Ok().content_type("text/html").body(rendered))
@@ -351,12 +388,11 @@ pub async fn list_menu_presets(
     session: actix_session::Session,
 ) -> Result<impl Responder, ApiErrorType> {
     // Check authentication
-    let _user_id = require_auth(&session).await.map_err(|e| {
-        ApiErrorType::Validation(format!("Authentication required: {}", e))
-    })?;
-    
-    let presets = storage.get_menu_presets()
-        .map_err(ApiErrorType::Storage)?;
+    let _user_id = require_auth(&session)
+        .await
+        .map_err(|e| ApiErrorType::Validation(format!("Authentication required: {}", e)))?;
+
+    let presets = storage.get_menu_presets().map_err(ApiErrorType::Storage)?;
     Ok(HttpResponse::Ok().json(presets))
 }
 
@@ -366,21 +402,21 @@ pub async fn create_menu_preset(
     preset_data: web::Json<CreateMenuPresetRequest>,
 ) -> Result<impl Responder, ApiErrorType> {
     // Check authentication
-    let _user_id = require_auth(&session).await.map_err(|e| {
-        ApiErrorType::Validation(format!("Authentication required: {}", e))
-    })?;
-    
+    let _user_id = require_auth(&session)
+        .await
+        .map_err(|e| ApiErrorType::Validation(format!("Authentication required: {}", e)))?;
+
     use chrono::Utc;
 
     // Validate that menu item IDs exist
-    let menu_items = storage.get_menu_items()
-        .map_err(ApiErrorType::Storage)?;
-    
+    let menu_items = storage.get_menu_items().map_err(ApiErrorType::Storage)?;
+
     for item_id in &preset_data.menu_item_ids {
         if !menu_items.iter().any(|item| &item.id == item_id) {
-            return Err(ApiErrorType::Validation(
-                format!("Menu item with id {} not found", item_id)
-            ));
+            return Err(ApiErrorType::Validation(format!(
+                "Menu item with id {} not found",
+                item_id
+            )));
         }
     }
 
@@ -393,7 +429,8 @@ pub async fn create_menu_preset(
         updated_at: Utc::now(),
     };
 
-    storage.add_menu_preset(new_preset.clone())
+    storage
+        .add_menu_preset(new_preset.clone())
         .map_err(ApiErrorType::Storage)?;
 
     Ok(HttpResponse::Created().json(new_preset))
@@ -405,20 +442,20 @@ pub async fn get_menu_preset(
     path: web::Path<Uuid>,
 ) -> Result<impl Responder, ApiErrorType> {
     // Check authentication
-    let _user_id = require_auth(&session).await.map_err(|e| {
-        ApiErrorType::Validation(format!("Authentication required: {}", e))
-    })?;
-    
+    let _user_id = require_auth(&session)
+        .await
+        .map_err(|e| ApiErrorType::Validation(format!("Authentication required: {}", e)))?;
+
     let preset_id = path.into_inner();
-    
-    let presets = storage.get_menu_presets()
-        .map_err(ApiErrorType::Storage)?;
-    
-    let preset = presets.into_iter()
+
+    let presets = storage.get_menu_presets().map_err(ApiErrorType::Storage)?;
+
+    let preset = presets
+        .into_iter()
         .find(|p| p.id == preset_id)
-        .ok_or_else(|| ApiErrorType::NotFound(
-            format!("Menu preset with id {} not found", preset_id)
-        ))?;
+        .ok_or_else(|| {
+            ApiErrorType::NotFound(format!("Menu preset with id {} not found", preset_id))
+        })?;
 
     Ok(HttpResponse::Ok().json(preset))
 }
@@ -430,34 +467,34 @@ pub async fn update_menu_preset(
     update_data: web::Json<UpdateMenuPresetRequest>,
 ) -> Result<impl Responder, ApiErrorType> {
     // Check authentication
-    let _user_id = require_auth(&session).await.map_err(|e| {
-        ApiErrorType::Validation(format!("Authentication required: {}", e))
-    })?;
-    
+    let _user_id = require_auth(&session)
+        .await
+        .map_err(|e| ApiErrorType::Validation(format!("Authentication required: {}", e)))?;
+
     use chrono::Utc;
-    
+
     let preset_id = path.into_inner();
-    
+
     // Get existing preset
-    let presets = storage.get_menu_presets()
-        .map_err(ApiErrorType::Storage)?;
-    
-    let mut existing_preset = presets.into_iter()
+    let presets = storage.get_menu_presets().map_err(ApiErrorType::Storage)?;
+
+    let mut existing_preset = presets
+        .into_iter()
         .find(|p| p.id == preset_id)
-        .ok_or_else(|| ApiErrorType::NotFound(
-            format!("Menu preset with id {} not found", preset_id)
-        ))?;
+        .ok_or_else(|| {
+            ApiErrorType::NotFound(format!("Menu preset with id {} not found", preset_id))
+        })?;
 
     // Validate menu item IDs if provided
     if let Some(menu_item_ids) = &update_data.menu_item_ids {
-        let menu_items = storage.get_menu_items()
-            .map_err(ApiErrorType::Storage)?;
-        
+        let menu_items = storage.get_menu_items().map_err(ApiErrorType::Storage)?;
+
         for item_id in menu_item_ids {
             if !menu_items.iter().any(|item| &item.id == item_id) {
-                return Err(ApiErrorType::Validation(
-                    format!("Menu item with id {} not found", item_id)
-                ));
+                return Err(ApiErrorType::Validation(format!(
+                    "Menu item with id {} not found",
+                    item_id
+                )));
             }
         }
         existing_preset.menu_item_ids = menu_item_ids.clone();
@@ -472,7 +509,8 @@ pub async fn update_menu_preset(
     }
     existing_preset.updated_at = Utc::now();
 
-    storage.update_menu_preset(preset_id, existing_preset.clone())
+    storage
+        .update_menu_preset(preset_id, existing_preset.clone())
         .map_err(ApiErrorType::Storage)?;
 
     Ok(HttpResponse::Ok().json(existing_preset))
@@ -484,13 +522,14 @@ pub async fn delete_menu_preset(
     path: web::Path<Uuid>,
 ) -> Result<impl Responder, AppError> {
     // Check authentication
-    let _user_id = require_auth(&session).await.map_err(|e| {
-        AppError::Validation(format!("Authentication required: {}", e))
-    })?;
-    
+    let _user_id = require_auth(&session)
+        .await
+        .map_err(|e| AppError::Validation(format!("Authentication required: {}", e)))?;
+
     let preset_id = path.into_inner();
-    
-    storage.delete_menu_preset(preset_id)
+
+    storage
+        .delete_menu_preset(preset_id)
         .map_err(|e| AppError::from(e))?;
 
     Ok(HttpResponse::NoContent())
@@ -503,11 +542,12 @@ pub async fn list_menu_schedules(
     session: actix_session::Session,
 ) -> Result<impl Responder, AppError> {
     // Check authentication
-    let _user_id = require_auth(&session).await.map_err(|e| {
-        AppError::Validation(format!("Authentication required: {}", e))
-    })?;
-    
-    let schedules = storage.get_menu_schedules()
+    let _user_id = require_auth(&session)
+        .await
+        .map_err(|e| AppError::Validation(format!("Authentication required: {}", e)))?;
+
+    let schedules = storage
+        .get_menu_schedules()
         .map_err(|e| AppError::from(e))?;
     Ok(HttpResponse::Ok().json(schedules))
 }
@@ -518,20 +558,23 @@ pub async fn create_menu_schedule(
     schedule_data: web::Json<CreateMenuScheduleRequest>,
 ) -> Result<impl Responder, AppError> {
     // Check authentication
-    let _user_id = require_auth(&session).await.map_err(|e| {
-        AppError::Validation(format!("Authentication required: {}", e))
-    })?;
-    
+    let _user_id = require_auth(&session)
+        .await
+        .map_err(|e| AppError::Validation(format!("Authentication required: {}", e)))?;
+
     use chrono::Utc;
 
     // Validate that preset exists
-    let presets = storage.get_menu_presets()
-        .map_err(|e| AppError::from(e))?;
-    
-    if !presets.iter().any(|preset| preset.id == schedule_data.preset_id) {
-        return Err(AppError::Validation(
-            format!("Menu preset with id {} not found", schedule_data.preset_id)
-        ));
+    let presets = storage.get_menu_presets().map_err(|e| AppError::from(e))?;
+
+    if !presets
+        .iter()
+        .any(|preset| preset.id == schedule_data.preset_id)
+    {
+        return Err(AppError::Validation(format!(
+            "Menu preset with id {} not found",
+            schedule_data.preset_id
+        )));
     }
 
     // Convert recurrence string to enum
@@ -552,17 +595,23 @@ pub async fn create_menu_schedule(
     };
 
     // Check for schedule conflicts
-    let existing_schedules = storage.get_menu_schedules()
+    let existing_schedules = storage
+        .get_menu_schedules()
         .map_err(|e| AppError::from(e))?;
-    
+
     for schedule in existing_schedules {
-        if schedule.preset_id == schedule_data.preset_id &&
-           ((schedule.start_time <= schedule_data.start_time && schedule.end_time >= schedule_data.start_time) ||
-            (schedule.start_time <= schedule_data.end_time && schedule.end_time >= schedule_data.end_time) ||
-            (schedule.start_time >= schedule_data.start_time && schedule.end_time <= schedule_data.end_time)) {
-            return Err(AppError::Validation(
-                format!("Schedule conflict with existing schedule id {}", schedule.id)
-            ));
+        if schedule.preset_id == schedule_data.preset_id
+            && ((schedule.start_time <= schedule_data.start_time
+                && schedule.end_time >= schedule_data.start_time)
+                || (schedule.start_time <= schedule_data.end_time
+                    && schedule.end_time >= schedule_data.end_time)
+                || (schedule.start_time >= schedule_data.start_time
+                    && schedule.end_time <= schedule_data.end_time))
+        {
+            return Err(AppError::Validation(format!(
+                "Schedule conflict with existing schedule id {}",
+                schedule.id
+            )));
         }
     }
 
@@ -579,7 +628,8 @@ pub async fn create_menu_schedule(
         updated_at: Utc::now(),
     };
 
-    storage.add_menu_schedule(new_schedule.clone())
+    storage
+        .add_menu_schedule(new_schedule.clone())
         .map_err(|e| AppError::from(e))?;
 
     Ok(HttpResponse::Created().json(new_schedule))
@@ -591,20 +641,22 @@ pub async fn get_menu_schedule(
     path: web::Path<Uuid>,
 ) -> Result<impl Responder, ApiErrorType> {
     // Check authentication
-    let _user_id = require_auth(&session).await.map_err(|e| {
-        ApiErrorType::Validation(format!("Authentication required: {}", e))
-    })?;
-    
+    let _user_id = require_auth(&session)
+        .await
+        .map_err(|e| ApiErrorType::Validation(format!("Authentication required: {}", e)))?;
+
     let schedule_id = path.into_inner();
-    
-    let schedules = storage.get_menu_schedules()
+
+    let schedules = storage
+        .get_menu_schedules()
         .map_err(ApiErrorType::Storage)?;
-    
-    let schedule = schedules.into_iter()
+
+    let schedule = schedules
+        .into_iter()
         .find(|s| s.id == schedule_id)
-        .ok_or_else(|| ApiErrorType::NotFound(
-            format!("Menu schedule with id {} not found", schedule_id)
-        ))?;
+        .ok_or_else(|| {
+            ApiErrorType::NotFound(format!("Menu schedule with id {} not found", schedule_id))
+        })?;
 
     Ok(HttpResponse::Ok().json(schedule))
 }
@@ -617,28 +669,30 @@ pub async fn update_menu_schedule(
 ) -> Result<impl Responder, AppError> {
     // Check authentication
     let _user_id = require_auth(&session).await.map_auth_err()?;
-    
+
     use chrono::Utc;
-    
+
     let schedule_id = path.into_inner();
-    
+
     // Get existing schedule
     let schedules = storage.get_menu_schedules().map_storage_err()?;
-    
-    let mut existing_schedule = schedules.into_iter()
+
+    let mut existing_schedule = schedules
+        .into_iter()
         .find(|s| s.id == schedule_id)
-        .ok_or_else(|| AppError::NotFound(
-            format!("Menu schedule with id {} not found", schedule_id)
-        ))?;
+        .ok_or_else(|| {
+            AppError::NotFound(format!("Menu schedule with id {} not found", schedule_id))
+        })?;
 
     // Validate preset_id if provided
     if let Some(preset_id) = update_data.preset_id {
         let presets = storage.get_menu_presets().map_storage_err()?;
-        
+
         if !presets.iter().any(|preset| preset.id == preset_id) {
-            return Err(AppError::Validation(
-                format!("Menu preset with id {} not found", preset_id)
-            ));
+            return Err(AppError::Validation(format!(
+                "Menu preset with id {} not found",
+                preset_id
+            )));
         }
         existing_schedule.preset_id = preset_id;
     }
@@ -656,7 +710,7 @@ pub async fn update_menu_schedule(
     if let Some(end_time) = update_data.end_time {
         existing_schedule.end_time = end_time;
     }
-    
+
     // Convert recurrence string to enum if provided
     if let Some(recurrence_str) = &update_data.recurrence {
         let recurrence = match recurrence_str.as_str() {
@@ -668,7 +722,7 @@ pub async fn update_menu_schedule(
         };
         existing_schedule.recurrence = recurrence;
     }
-    
+
     // Convert status string to enum if provided
     if let Some(status_str) = &update_data.status {
         let status = match status_str.as_str() {
@@ -679,10 +733,12 @@ pub async fn update_menu_schedule(
         };
         existing_schedule.status = status;
     }
-    
+
     existing_schedule.updated_at = Utc::now();
 
-    storage.update_menu_schedule(schedule_id, existing_schedule.clone()).map_storage_err()?;
+    storage
+        .update_menu_schedule(schedule_id, existing_schedule.clone())
+        .map_storage_err()?;
 
     Ok(HttpResponse::Ok().json(existing_schedule))
 }
@@ -694,10 +750,12 @@ pub async fn delete_menu_schedule(
 ) -> Result<impl Responder, AppError> {
     // Check authentication
     let _user_id = require_auth(&session).await.map_auth_err()?;
-    
+
     let schedule_id = path.into_inner();
-    
-    storage.delete_menu_schedule(schedule_id).map_storage_err()?;
+
+    storage
+        .delete_menu_schedule(schedule_id)
+        .map_storage_err()?;
 
     Ok(HttpResponse::NoContent())
 }
@@ -708,13 +766,14 @@ pub async fn get_upcoming_schedules(
 ) -> Result<impl Responder, AppError> {
     // Check authentication
     let _user_id = require_auth(&session).await.map_auth_err()?;
-    
+
     use chrono::Utc;
-    
+
     let schedules = storage.get_menu_schedules().map_storage_err()?;
-    
+
     // Filter for upcoming schedules (start time is in the future)
-    let upcoming_schedules: Vec<MenuSchedule> = schedules.into_iter()
+    let upcoming_schedules: Vec<MenuSchedule> = schedules
+        .into_iter()
         .filter(|schedule| schedule.start_time > Utc::now())
         .collect();
 
@@ -728,69 +787,66 @@ pub async fn validate_schedule(
 ) -> Result<impl Responder, AppError> {
     // Check authentication
     let _user_id = require_auth(&session).await.map_auth_err()?;
-    
+
     // Validate that end time is after start time
     if validation_data.end_time <= validation_data.start_time {
         return Err(AppError::Validation(
-            "End time must be after start time".to_string()
+            "End time must be after start time".to_string(),
         ));
     }
-    
+
     // Validate preset exists if provided
     if let Some(preset_id) = validation_data.preset_id {
         let presets = storage.get_menu_presets().map_storage_err()?;
-        
+
         if !presets.iter().any(|preset| preset.id == preset_id) {
-            return Err(AppError::Validation(
-                format!("Menu preset with id {} not found", preset_id)
-            ));
+            return Err(AppError::Validation(format!(
+                "Menu preset with id {} not found",
+                preset_id
+            )));
         }
     }
-    
+
     // Validate name if provided
     if let Some(name) = &validation_data.name {
         if name.trim().is_empty() {
             return Err(AppError::Validation(
-                "Schedule name cannot be empty".to_string()
+                "Schedule name cannot be empty".to_string(),
             ));
         }
     }
-    
+
     // Validate description if provided
     if let Some(description) = &validation_data.description {
         if description.trim().is_empty() {
             return Err(AppError::Validation(
-                "Schedule description cannot be empty".to_string()
+                "Schedule description cannot be empty".to_string(),
             ));
         }
     }
-    
+
     // Validate recurrence if provided
     if let Some(recurrence) = &validation_data.recurrence {
         match recurrence.as_str() {
-            "Daily" | "Weekly" | "Monthly" | "Custom" => {},
-            _ => return Err(AppError::Validation(
-                "Invalid recurrence value".to_string()
-            )),
+            "Daily" | "Weekly" | "Monthly" | "Custom" => {}
+            _ => return Err(AppError::Validation("Invalid recurrence value".to_string())),
         }
     }
-    
+
     // Validate status if provided
     if let Some(status) = &validation_data.status {
         match status.as_str() {
-            "Active" | "Inactive" | "Pending" => {},
-            _ => return Err(AppError::Validation(
-                "Invalid status value".to_string()
-            )),
+            "Active" | "Inactive" | "Pending" => {}
+            _ => return Err(AppError::Validation("Invalid status value".to_string())),
         }
     }
-    
+
     // Check for schedule conflicts
     let existing_schedules = storage.get_menu_schedules().map_storage_err()?;
-    
+
     let mut conflicts = Vec::new();
     let schedule_id = validation_data.schedule_id;
-    
+
     for schedule in existing_schedules {
         // Skip the schedule being updated
         if let Some(id) = schedule_id {
@@ -798,11 +854,15 @@ pub async fn validate_schedule(
                 continue;
             }
         }
-        
+
         // Check for time overlap
-        if (schedule.start_time <= validation_data.start_time && schedule.end_time >= validation_data.start_time) ||
-           (schedule.start_time <= validation_data.end_time && schedule.end_time >= validation_data.end_time) ||
-           (schedule.start_time >= validation_data.start_time && schedule.end_time <= validation_data.end_time) {
+        if (schedule.start_time <= validation_data.start_time
+            && schedule.end_time >= validation_data.start_time)
+            || (schedule.start_time <= validation_data.end_time
+                && schedule.end_time >= validation_data.end_time)
+            || (schedule.start_time >= validation_data.start_time
+                && schedule.end_time <= validation_data.end_time)
+        {
             // If preset_id is provided, only check conflicts with schedules that use the same preset
             if let Some(preset_id) = validation_data.preset_id {
                 if schedule.preset_id == preset_id {
@@ -841,28 +901,24 @@ pub async fn menu_page(
     tera: web::Data<Tera>,
 ) -> Result<HttpResponse, ApiErrorType> {
     println!("DEBUG: menu_page handler called");
-    
+
     // Get menu items and filter for available ones
-    let menu_items = storage.get_menu_items()
-        .map_err(ApiErrorType::Storage)?;
-    let available_menu_items: Vec<&MenuItem> = menu_items.iter()
-        .filter(|item| item.is_available)
-        .collect();
-    
+    let menu_items = storage.get_menu_items().map_err(ApiErrorType::Storage)?;
+    let available_menu_items: Vec<&MenuItem> =
+        menu_items.iter().filter(|item| item.is_available).collect();
+
     // Get notices and filter for active ones
-    let notices = storage.get_notices()
-        .map_err(ApiErrorType::Storage)?;
-    let active_notices: Vec<&Notice> = notices.iter()
-        .filter(|notice| notice.is_active)
-        .collect();
-    
+    let notices = storage.get_notices().map_err(ApiErrorType::Storage)?;
+    let active_notices: Vec<&Notice> = notices.iter().filter(|notice| notice.is_active).collect();
+
     // Prepare context for template
     let mut context = tera::Context::new();
     context.insert("menu_items", &available_menu_items);
     context.insert("notices", &active_notices);
-    
+
     // Render the template
-    let rendered = tera.render("menu.html", &context)
+    let rendered = tera
+        .render("menu.html", &context)
         .map_err(|e| ApiErrorType::Validation(format!("Template error: {}", e)))?;
 
     Ok(HttpResponse::Ok().content_type("text/html").body(rendered))
@@ -875,79 +931,178 @@ pub async fn menu_schedules_page(
     tera: web::Data<Tera>,
 ) -> Result<HttpResponse, ApiErrorType> {
     println!("DEBUG: menu_schedules_page handler called");
-    
+
     // Check authentication
     let _user_id = require_auth(&session).await.map_err(|e| {
         println!("DEBUG: Authentication failed in menu_schedules_page: {}", e);
         ApiErrorType::Validation(format!("Authentication required: {}", e))
     })?;
-    
+
     // Get menu presets for the dropdown
-    let presets = storage.get_menu_presets()
-        .map_err(ApiErrorType::Storage)?;
-    
+    let presets = storage.get_menu_presets().map_err(ApiErrorType::Storage)?;
+
     // Get menu schedules
-    let schedules = storage.get_menu_schedules()
+    let schedules = storage
+        .get_menu_schedules()
         .map_err(ApiErrorType::Storage)?;
-    
+
     // Prepare context for template
     let mut context = tera::Context::new();
     context.insert("presets", &presets);
     context.insert("schedules", &schedules);
-    
+
     // Add session data to template context
     if let Ok(Some(username)) = session.get::<String>("username") {
-        context.insert("session", &serde_json::json!({
-            "username": username,
-            "user_id": session.get::<Uuid>("user_id").ok().flatten()
-        }));
+        context.insert(
+            "session",
+            &serde_json::json!({
+                "username": username,
+                "user_id": session.get::<Uuid>("user_id").ok().flatten()
+            }),
+        );
     }
-    
+
     // Render the template
-    let rendered = tera.render("admin/schedules.html", &context)
+    let rendered = tera
+        .render("admin/schedules.html", &context)
         .map_err(|e| ApiErrorType::Validation(format!("Template error: {}", e)))?;
-    
+
     Ok(HttpResponse::Ok().content_type("text/html").body(rendered))
 }
 
 // Menu Presets Page Handler
+
+// Reload Handlers
+pub async fn reload_menu_items(
+    storage: web::Data<JsonStorage>,
+    session: actix_session::Session,
+) -> Result<impl Responder, ApiErrorType> {
+    // Check authentication
+    let _user_id = require_auth(&session)
+        .await
+        .map_err(|e| ApiErrorType::Validation(format!("Authentication required: {}", e)))?;
+
+    // Reload menu items from storage
+    storage.load_menu_items().map_err(ApiErrorType::Storage)?;
+
+    Ok(HttpResponse::Ok().json(serde_json::json!({
+        "status": "success",
+        "message": "Menu items reloaded successfully"
+    })))
+}
+
+pub async fn reload_notices(
+    storage: web::Data<JsonStorage>,
+    session: actix_session::Session,
+) -> Result<impl Responder, ApiErrorType> {
+    // Check authentication
+    let _user_id = require_auth(&session)
+        .await
+        .map_err(|e| ApiErrorType::Validation(format!("Authentication required: {}", e)))?;
+
+    // Reload notices from storage
+    storage.load_notices().map_err(ApiErrorType::Storage)?;
+
+    Ok(HttpResponse::Ok().json(serde_json::json!({
+        "status": "success",
+        "message": "Notices reloaded successfully"
+    })))
+}
+
+pub async fn reload_admin_users(
+    storage: web::Data<JsonStorage>,
+    session: actix_session::Session,
+) -> Result<impl Responder, ApiErrorType> {
+    // Check authentication
+    let _user_id = require_auth(&session)
+        .await
+        .map_err(|e| ApiErrorType::Validation(format!("Authentication required: {}", e)))?;
+
+    // Reload admin users from storage
+    storage.load_admin_users().map_err(ApiErrorType::Storage)?;
+
+    Ok(HttpResponse::Ok().json(serde_json::json!({
+        "status": "success",
+        "message": "Admin users reloaded successfully"
+    })))
+}
+
+pub async fn reload_menu_presets(
+    storage: web::Data<JsonStorage>,
+    session: actix_session::Session,
+) -> Result<impl Responder, ApiErrorType> {
+    // Check authentication
+    let _user_id = require_auth(&session)
+        .await
+        .map_err(|e| ApiErrorType::Validation(format!("Authentication required: {}", e)))?;
+
+    // Reload menu presets from storage
+    storage.load_menu_presets().map_err(ApiErrorType::Storage)?;
+
+    Ok(HttpResponse::Ok().json(serde_json::json!({
+        "status": "success",
+        "message": "Menu presets reloaded successfully"
+    })))
+}
+
+pub async fn reload_menu_schedules(
+    storage: web::Data<JsonStorage>,
+    session: actix_session::Session,
+) -> Result<impl Responder, ApiErrorType> {
+    // Check authentication
+    let _user_id = require_auth(&session)
+        .await
+        .map_err(|e| ApiErrorType::Validation(format!("Authentication required: {}", e)))?;
+
+    // Reload menu schedules from storage
+    storage
+        .load_menu_schedules()
+        .map_err(ApiErrorType::Storage)?;
+
+    Ok(HttpResponse::Ok().json(serde_json::json!({
+        "status": "success",
+        "message": "Menu schedules reloaded successfully"
+    })))
+}
 pub async fn menu_presets_page(
     storage: web::Data<JsonStorage>,
     session: actix_session::Session,
     tera: web::Data<Tera>,
 ) -> Result<HttpResponse, ApiErrorType> {
     println!("DEBUG: menu_presets_page handler called");
-    
+
     // Check authentication
     let _user_id = require_auth(&session).await.map_err(|e| {
         println!("DEBUG: Authentication failed in menu_presets_page: {}", e);
         ApiErrorType::Validation(format!("Authentication required: {}", e))
     })?;
-    
+
     // Get menu items for the dropdown
-    let menu_items = storage.get_menu_items()
-        .map_err(ApiErrorType::Storage)?;
-    
+    let menu_items = storage.get_menu_items().map_err(ApiErrorType::Storage)?;
+
     // Get menu presets
-    let presets = storage.get_menu_presets()
-        .map_err(ApiErrorType::Storage)?;
-    
+    let presets = storage.get_menu_presets().map_err(ApiErrorType::Storage)?;
+
     // Prepare context for template
     let mut context = tera::Context::new();
     context.insert("menu_items", &menu_items);
     context.insert("presets", &presets);
-    
+
     // Add session data to template context
     if let Ok(Some(username)) = session.get::<String>("username") {
-        context.insert("session", &serde_json::json!({
-            "username": username,
-            "user_id": session.get::<Uuid>("user_id").ok().flatten()
-        }));
+        context.insert(
+            "session",
+            &serde_json::json!({
+                "username": username,
+                "user_id": session.get::<Uuid>("user_id").ok().flatten()
+            }),
+        );
     }
-    
+
     // Render the template
-    let rendered = tera.render("admin/presets.html", &context)
+    let rendered = tera
+        .render("admin/presets.html", &context)
         .map_err(|e| ApiErrorType::Validation(format!("Template error: {}", e)))?;
-    
+
     Ok(HttpResponse::Ok().content_type("text/html").body(rendered))
 }

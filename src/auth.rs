@@ -1,18 +1,15 @@
-use actix_web::{web, HttpResponse, Responder};
 use actix_session::Session;
+use actix_web::{HttpResponse, Responder, web};
 use argon2::{
-    password_hash::{
-        rand_core::OsRng,
-        PasswordHash, PasswordHasher, PasswordVerifier, SaltString
-    },
-    Argon2
+    Argon2,
+    password_hash::{PasswordHash, PasswordHasher, PasswordVerifier, SaltString, rand_core::OsRng},
 };
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use uuid::Uuid;
 
-use crate::storage::{JsonStorage, AdminUser, StorageError};
 use crate::error_handler::{AppError, ResultExt};
+use crate::storage::{AdminUser, JsonStorage, StorageError};
 #[derive(Debug, Deserialize)]
 pub struct LoginRequest {
     pub username: String,
@@ -67,7 +64,9 @@ pub async fn login_handler(
     login_data: web::Json<LoginRequest>,
 ) -> Result<impl Responder, AppError> {
     // Find user by username
-    let user = storage.get_ref().get_admin_user_by_username(&login_data.username)
+    let user = storage
+        .get_ref()
+        .get_admin_user_by_username(&login_data.username)
         .map_storage_err()?
         .ok_or(AppError::Auth("Invalid username or password".to_string()))?;
 
@@ -78,16 +77,14 @@ pub async fn login_handler(
 
     // Set session
     log::debug!("Setting session for user: {}", user.username);
-    session.insert("user_id", user.id)
-        .map_err(|e| {
-            log::debug!("Error setting user_id in session: {:?}", e);
-            AppError::Auth("Session error".to_string())
-        })?;
-    session.insert("username", user.username)
-        .map_err(|e| {
-            log::debug!("Error setting username in session: {:?}", e);
-            AppError::Auth("Session error".to_string())
-        })?;
+    session.insert("user_id", user.id).map_err(|e| {
+        log::debug!("Error setting user_id in session: {:?}", e);
+        AppError::Auth("Session error".to_string())
+    })?;
+    session.insert("username", user.username).map_err(|e| {
+        log::debug!("Error setting username in session: {:?}", e);
+        AppError::Auth("Session error".to_string())
+    })?;
 
     session.renew();
     log::debug!("Session renewed successfully");
@@ -101,7 +98,11 @@ pub async fn login_handler(
         log::debug!("Error getting username for verification: {:?}", e);
         AppError::Auth("Session error".to_string())
     })?;
-    log::debug!("Session verification - user_id: {:?}, username: {:?}", check_user_id, check_username);
+    log::debug!(
+        "Session verification - user_id: {:?}, username: {:?}",
+        check_user_id,
+        check_username
+    );
 
     let response = HttpResponse::SeeOther()
         .insert_header(("Location", "/admin"))
@@ -115,23 +116,22 @@ pub async fn login_handler(
 }
 
 /// Logout handler for POST /admin/logout
-pub async fn logout_handler(
-    session: Session,
-) -> impl Responder {
+pub async fn logout_handler(session: Session) -> impl Responder {
     session.purge();
-    HttpResponse::Ok().json(crate::handlers::ApiError { error: "Logout successful".to_string() })
+    HttpResponse::Ok().json(crate::handlers::ApiError {
+        error: "Logout successful".to_string(),
+    })
 }
 
 /// Middleware to protect admin routes
-pub async fn require_auth(
-    session: &Session,
-) -> Result<Uuid, AppError> {
+pub async fn require_auth(session: &Session) -> Result<Uuid, AppError> {
     log::debug!("require_auth() called");
-    
+
     let user_id_result = session.get::<Uuid>("user_id");
     log::debug!("user_id result: {:?}", user_id_result);
-    
-    let user_id: Uuid = session.get("user_id")
+
+    let user_id: Uuid = session
+        .get("user_id")
         .map_err(|e| {
             log::debug!("Session error getting user_id: {:?}", e);
             AppError::Auth("Session error".to_string())
@@ -140,7 +140,7 @@ pub async fn require_auth(
             log::debug!("No user_id found in session");
             AppError::Auth("Invalid username or password".to_string())
         })?;
-        
+
     log::debug!("User ID found: {}", user_id);
     Ok(user_id)
 }
@@ -148,38 +148,36 @@ pub async fn require_auth(
 /// Create a default admin user if none exists
 pub async fn create_default_admin(storage: web::Data<JsonStorage>) -> Result<(), AppError> {
     log::debug!("create_default_admin() started");
-    
+
     log::debug!("Getting admin users list");
     let users = storage.get_ref().get_admin_users().map_storage_err()?;
     log::debug!("Found {} admin users", users.len());
-    
+
     if users.is_empty() {
         log::debug!("No admin users found, creating default admin");
         log::debug!("Hashing password...");
         let password_hash = hash_password("admin123")?;
         log::debug!("Password hashed successfully");
-        
+
         let admin_user = AdminUser {
             id: Uuid::new_v4(),
             username: "admin".to_string(),
             password_hash,
         };
-        
+
         log::debug!("Adding admin user to storage on blocking thread");
         // Move the blocking storage operation to a dedicated thread
         let storage_clone = storage.clone();
-        actix_rt::task::spawn_blocking(move || {
-            storage_clone.get_ref().add_admin_user(admin_user)
-        })
-        .await
-        .map_err(|e| AppError::Internal(e.to_string()))?
-        .map_storage_err()?;
-        
+        actix_rt::task::spawn_blocking(move || storage_clone.get_ref().add_admin_user(admin_user))
+            .await
+            .map_err(|e| AppError::Internal(e.to_string()))?
+            .map_storage_err()?;
+
         log::info!("Default admin user created: username='admin', password='admin123'");
     } else {
         log::debug!("Admin users already exist, skipping creation");
     }
-    
+
     log::debug!("create_default_admin() completed successfully");
     Ok(())
 }

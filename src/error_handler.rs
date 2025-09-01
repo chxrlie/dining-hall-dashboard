@@ -1,7 +1,7 @@
 use actix_web::{HttpResponse, ResponseError};
-use thiserror::Error;
 use serde::{Deserialize, Serialize};
 use std::fmt;
+use thiserror::Error;
 
 /// A user-friendly error response structure
 #[derive(Debug, Serialize, Deserialize)]
@@ -18,19 +18,19 @@ pub enum AppError {
     /// Storage-related errors
     #[error("Storage error: {0}")]
     Storage(String),
-    
+
     /// Authentication-related errors
     #[error("Authentication error: {0}")]
     Auth(String),
-    
+
     /// Validation errors
     #[error("Validation error: {0}")]
     Validation(String),
-    
+
     /// Not found errors
     #[error("Not found: {0}")]
     NotFound(String),
-    
+
     /// Internal server errors
     #[error("Internal server error: {0}")]
     Internal(String),
@@ -88,7 +88,7 @@ impl ResponseError for AppError {
             AppError::NotFound(_) => actix_web::http::StatusCode::NOT_FOUND,
             AppError::Internal(_) => actix_web::http::StatusCode::INTERNAL_SERVER_ERROR,
         };
-        
+
         HttpResponse::build(status_code).json(error_response)
     }
 }
@@ -98,7 +98,7 @@ pub trait ResultExt<T, E> {
     fn map_storage_err(self) -> Result<T, AppError>
     where
         E: fmt::Display;
-    
+
     fn map_auth_err(self) -> Result<T, AppError>
     where
         E: fmt::Display;
@@ -111,7 +111,7 @@ impl<T, E> ResultExt<T, E> for Result<T, E> {
     {
         self.map_err(|e| AppError::Storage(e.to_string()))
     }
-    
+
     fn map_auth_err(self) -> Result<T, AppError>
     where
         E: fmt::Display,
