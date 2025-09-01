@@ -1,18 +1,18 @@
 use actix_web::{web, HttpResponse, Responder};
 use serde::{Deserialize, Serialize};
-use thiserror::Error;
 use uuid::Uuid;
 use tera::Tera;
 
-use crate::storage::{JsonStorage, MenuItem, Notice, StorageError, MenuPreset, MenuSchedule, ScheduleRecurrence, ScheduleStatus};
+use crate::storage::{JsonStorage, MenuItem, Notice, MenuPreset, MenuSchedule, ScheduleRecurrence, ScheduleStatus, StorageError};
 use crate::auth::require_auth;
+use crate::error_handler::{AppError, ResultExt};
 
 #[derive(Debug, Serialize)]
 pub struct ApiError {
     pub error: String,
 }
 
-#[derive(Debug, Error)]
+#[derive(Debug, thiserror::Error)]
 pub enum ApiErrorType {
     #[error("Storage error: {0}")]
     Storage(#[from] StorageError),
@@ -20,6 +20,18 @@ pub enum ApiErrorType {
     Validation(String),
     #[error("Not found: {0}")]
     NotFound(String),
+}
+
+impl From<AppError> for ApiErrorType {
+    fn from(app_error: AppError) -> Self {
+        match app_error {
+            AppError::Storage(msg) => ApiErrorType::Storage(StorageError::Io(std::io::Error::new(std::io::ErrorKind::Other, msg))),
+            AppError::Auth(msg) => ApiErrorType::Validation(format!("Auth error: {}", msg)),
+            AppError::Validation(msg) => ApiErrorType::Validation(msg),
+            AppError::NotFound(msg) => ApiErrorType::NotFound(msg),
+            AppError::Internal(msg) => ApiErrorType::Validation(format!("Internal error: {}", msg)),
+        }
+    }
 }
 
 impl actix_web::ResponseError for ApiErrorType {
@@ -148,7 +160,7 @@ pub async fn create_menu_item(
 
     println!("DEBUG: About to add menu item to storage: {:?}", new_item);
     storage.add_menu_item(new_item.clone())
-        .map_err(ApiErrorType::Storage)?;
+        .map_err(ApiErrorType::from)?;
     println!("DEBUG: Menu item added to storage successfully");
 
     Ok(HttpResponse::Created().json(new_item))
@@ -191,7 +203,7 @@ pub async fn update_menu_item(
     };
 
     storage.update_menu_item(item_id, updated_item.clone())
-        .map_err(ApiErrorType::Storage)?;
+        .map_err(ApiErrorType::from)?;
 
     Ok(HttpResponse::Ok().json(updated_item))
 }
@@ -203,7 +215,7 @@ pub async fn delete_menu_item(
     let item_id = path.into_inner();
     
     storage.delete_menu_item(item_id)
-        .map_err(ApiErrorType::Storage)?;
+        .map_err(ApiErrorType::from)?;
 
     Ok(HttpResponse::NoContent())
 }
@@ -232,7 +244,7 @@ pub async fn create_notice(
     };
 
     storage.add_notice(new_notice.clone())
-        .map_err(ApiErrorType::Storage)?;
+        .map_err(ApiErrorType::from)?;
 
     Ok(HttpResponse::Created().json(new_notice))
 }
@@ -263,7 +275,7 @@ pub async fn update_notice(
     };
 
     storage.update_notice(notice_id, updated_notice.clone())
-        .map_err(ApiErrorType::Storage)?;
+        .map_err(ApiErrorType::from)?;
 
     Ok(HttpResponse::Ok().json(updated_notice))
 }
@@ -275,7 +287,7 @@ pub async fn delete_notice(
     let notice_id = path.into_inner();
     
     storage.delete_notice(notice_id)
-        .map_err(ApiErrorType::Storage)?;
+        .map_err(ApiErrorType::from)?;
 
     Ok(HttpResponse::NoContent())
 }
@@ -470,16 +482,16 @@ pub async fn delete_menu_preset(
     storage: web::Data<JsonStorage>,
     session: actix_session::Session,
     path: web::Path<Uuid>,
-) -> Result<impl Responder, ApiErrorType> {
+) -> Result<impl Responder, AppError> {
     // Check authentication
     let _user_id = require_auth(&session).await.map_err(|e| {
-        ApiErrorType::Validation(format!("Authentication required: {}", e))
+        AppError::Validation(format!("Authentication required: {}", e))
     })?;
     
     let preset_id = path.into_inner();
     
     storage.delete_menu_preset(preset_id)
-        .map_err(ApiErrorType::Storage)?;
+        .map_err(|e| AppError::from(e))?;
 
     Ok(HttpResponse::NoContent())
 }
@@ -489,14 +501,14 @@ pub async fn delete_menu_preset(
 pub async fn list_menu_schedules(
     storage: web::Data<JsonStorage>,
     session: actix_session::Session,
-) -> Result<impl Responder, ApiErrorType> {
+) -> Result<impl Responder, AppError> {
     // Check authentication
     let _user_id = require_auth(&session).await.map_err(|e| {
-        ApiErrorType::Validation(format!("Authentication required: {}", e))
+        AppError::Validation(format!("Authentication required: {}", e))
     })?;
     
     let schedules = storage.get_menu_schedules()
-        .map_err(ApiErrorType::Storage)?;
+        .map_err(|e| AppError::from(e))?;
     Ok(HttpResponse::Ok().json(schedules))
 }
 
@@ -504,20 +516,20 @@ pub async fn create_menu_schedule(
     storage: web::Data<JsonStorage>,
     session: actix_session::Session,
     schedule_data: web::Json<CreateMenuScheduleRequest>,
-) -> Result<impl Responder, ApiErrorType> {
+) -> Result<impl Responder, AppError> {
     // Check authentication
     let _user_id = require_auth(&session).await.map_err(|e| {
-        ApiErrorType::Validation(format!("Authentication required: {}", e))
+        AppError::Validation(format!("Authentication required: {}", e))
     })?;
     
     use chrono::Utc;
 
     // Validate that preset exists
     let presets = storage.get_menu_presets()
-        .map_err(ApiErrorType::Storage)?;
+        .map_err(|e| AppError::from(e))?;
     
     if !presets.iter().any(|preset| preset.id == schedule_data.preset_id) {
-        return Err(ApiErrorType::Validation(
+        return Err(AppError::Validation(
             format!("Menu preset with id {} not found", schedule_data.preset_id)
         ));
     }
@@ -528,7 +540,7 @@ pub async fn create_menu_schedule(
         "Weekly" => ScheduleRecurrence::Weekly,
         "Monthly" => ScheduleRecurrence::Monthly,
         "Custom" => ScheduleRecurrence::Custom,
-        _ => return Err(ApiErrorType::Validation("Invalid recurrence value".to_string())),
+        _ => return Err(AppError::Validation("Invalid recurrence value".to_string())),
     };
 
     // Convert status string to enum
@@ -536,19 +548,19 @@ pub async fn create_menu_schedule(
         "Active" => ScheduleStatus::Active,
         "Inactive" => ScheduleStatus::Inactive,
         "Pending" => ScheduleStatus::Pending,
-        _ => return Err(ApiErrorType::Validation("Invalid status value".to_string())),
+        _ => return Err(AppError::Validation("Invalid status value".to_string())),
     };
 
     // Check for schedule conflicts
     let existing_schedules = storage.get_menu_schedules()
-        .map_err(ApiErrorType::Storage)?;
+        .map_err(|e| AppError::from(e))?;
     
     for schedule in existing_schedules {
         if schedule.preset_id == schedule_data.preset_id &&
            ((schedule.start_time <= schedule_data.start_time && schedule.end_time >= schedule_data.start_time) ||
             (schedule.start_time <= schedule_data.end_time && schedule.end_time >= schedule_data.end_time) ||
             (schedule.start_time >= schedule_data.start_time && schedule.end_time <= schedule_data.end_time)) {
-            return Err(ApiErrorType::Validation(
+            return Err(AppError::Validation(
                 format!("Schedule conflict with existing schedule id {}", schedule.id)
             ));
         }
@@ -568,7 +580,7 @@ pub async fn create_menu_schedule(
     };
 
     storage.add_menu_schedule(new_schedule.clone())
-        .map_err(ApiErrorType::Storage)?;
+        .map_err(|e| AppError::from(e))?;
 
     Ok(HttpResponse::Created().json(new_schedule))
 }
@@ -602,33 +614,29 @@ pub async fn update_menu_schedule(
     session: actix_session::Session,
     path: web::Path<Uuid>,
     update_data: web::Json<UpdateMenuScheduleRequest>,
-) -> Result<impl Responder, ApiErrorType> {
+) -> Result<impl Responder, AppError> {
     // Check authentication
-    let _user_id = require_auth(&session).await.map_err(|e| {
-        ApiErrorType::Validation(format!("Authentication required: {}", e))
-    })?;
+    let _user_id = require_auth(&session).await.map_auth_err()?;
     
     use chrono::Utc;
     
     let schedule_id = path.into_inner();
     
     // Get existing schedule
-    let schedules = storage.get_menu_schedules()
-        .map_err(ApiErrorType::Storage)?;
+    let schedules = storage.get_menu_schedules().map_storage_err()?;
     
     let mut existing_schedule = schedules.into_iter()
         .find(|s| s.id == schedule_id)
-        .ok_or_else(|| ApiErrorType::NotFound(
+        .ok_or_else(|| AppError::NotFound(
             format!("Menu schedule with id {} not found", schedule_id)
         ))?;
 
     // Validate preset_id if provided
     if let Some(preset_id) = update_data.preset_id {
-        let presets = storage.get_menu_presets()
-            .map_err(ApiErrorType::Storage)?;
+        let presets = storage.get_menu_presets().map_storage_err()?;
         
         if !presets.iter().any(|preset| preset.id == preset_id) {
-            return Err(ApiErrorType::Validation(
+            return Err(AppError::Validation(
                 format!("Menu preset with id {} not found", preset_id)
             ));
         }
@@ -656,7 +664,7 @@ pub async fn update_menu_schedule(
             "Weekly" => ScheduleRecurrence::Weekly,
             "Monthly" => ScheduleRecurrence::Monthly,
             "Custom" => ScheduleRecurrence::Custom,
-            _ => return Err(ApiErrorType::Validation("Invalid recurrence value".to_string())),
+            _ => return Err(AppError::Validation("Invalid recurrence value".to_string())),
         };
         existing_schedule.recurrence = recurrence;
     }
@@ -667,15 +675,14 @@ pub async fn update_menu_schedule(
             "Active" => ScheduleStatus::Active,
             "Inactive" => ScheduleStatus::Inactive,
             "Pending" => ScheduleStatus::Pending,
-            _ => return Err(ApiErrorType::Validation("Invalid status value".to_string())),
+            _ => return Err(AppError::Validation("Invalid status value".to_string())),
         };
         existing_schedule.status = status;
     }
     
     existing_schedule.updated_at = Utc::now();
 
-    storage.update_menu_schedule(schedule_id, existing_schedule.clone())
-        .map_err(ApiErrorType::Storage)?;
+    storage.update_menu_schedule(schedule_id, existing_schedule.clone()).map_storage_err()?;
 
     Ok(HttpResponse::Ok().json(existing_schedule))
 }
@@ -684,16 +691,13 @@ pub async fn delete_menu_schedule(
     storage: web::Data<JsonStorage>,
     session: actix_session::Session,
     path: web::Path<Uuid>,
-) -> Result<impl Responder, ApiErrorType> {
+) -> Result<impl Responder, AppError> {
     // Check authentication
-    let _user_id = require_auth(&session).await.map_err(|e| {
-        ApiErrorType::Validation(format!("Authentication required: {}", e))
-    })?;
+    let _user_id = require_auth(&session).await.map_auth_err()?;
     
     let schedule_id = path.into_inner();
     
-    storage.delete_menu_schedule(schedule_id)
-        .map_err(ApiErrorType::Storage)?;
+    storage.delete_menu_schedule(schedule_id).map_storage_err()?;
 
     Ok(HttpResponse::NoContent())
 }
@@ -701,16 +705,13 @@ pub async fn delete_menu_schedule(
 pub async fn get_upcoming_schedules(
     storage: web::Data<JsonStorage>,
     session: actix_session::Session,
-) -> Result<impl Responder, ApiErrorType> {
+) -> Result<impl Responder, AppError> {
     // Check authentication
-    let _user_id = require_auth(&session).await.map_err(|e| {
-        ApiErrorType::Validation(format!("Authentication required: {}", e))
-    })?;
+    let _user_id = require_auth(&session).await.map_auth_err()?;
     
     use chrono::Utc;
     
-    let schedules = storage.get_menu_schedules()
-        .map_err(ApiErrorType::Storage)?;
+    let schedules = storage.get_menu_schedules().map_storage_err()?;
     
     // Filter for upcoming schedules (start time is in the future)
     let upcoming_schedules: Vec<MenuSchedule> = schedules.into_iter()
@@ -724,26 +725,23 @@ pub async fn validate_schedule(
     storage: web::Data<JsonStorage>,
     session: actix_session::Session,
     validation_data: web::Json<ValidateScheduleRequest>,
-) -> Result<impl Responder, ApiErrorType> {
+) -> Result<impl Responder, AppError> {
     // Check authentication
-    let _user_id = require_auth(&session).await.map_err(|e| {
-        ApiErrorType::Validation(format!("Authentication required: {}", e))
-    })?;
+    let _user_id = require_auth(&session).await.map_auth_err()?;
     
     // Validate that end time is after start time
     if validation_data.end_time <= validation_data.start_time {
-        return Err(ApiErrorType::Validation(
+        return Err(AppError::Validation(
             "End time must be after start time".to_string()
         ));
     }
     
     // Validate preset exists if provided
     if let Some(preset_id) = validation_data.preset_id {
-        let presets = storage.get_menu_presets()
-            .map_err(ApiErrorType::Storage)?;
+        let presets = storage.get_menu_presets().map_storage_err()?;
         
         if !presets.iter().any(|preset| preset.id == preset_id) {
-            return Err(ApiErrorType::Validation(
+            return Err(AppError::Validation(
                 format!("Menu preset with id {} not found", preset_id)
             ));
         }
@@ -752,7 +750,7 @@ pub async fn validate_schedule(
     // Validate name if provided
     if let Some(name) = &validation_data.name {
         if name.trim().is_empty() {
-            return Err(ApiErrorType::Validation(
+            return Err(AppError::Validation(
                 "Schedule name cannot be empty".to_string()
             ));
         }
@@ -761,7 +759,7 @@ pub async fn validate_schedule(
     // Validate description if provided
     if let Some(description) = &validation_data.description {
         if description.trim().is_empty() {
-            return Err(ApiErrorType::Validation(
+            return Err(AppError::Validation(
                 "Schedule description cannot be empty".to_string()
             ));
         }
@@ -771,7 +769,7 @@ pub async fn validate_schedule(
     if let Some(recurrence) = &validation_data.recurrence {
         match recurrence.as_str() {
             "Daily" | "Weekly" | "Monthly" | "Custom" => {},
-            _ => return Err(ApiErrorType::Validation(
+            _ => return Err(AppError::Validation(
                 "Invalid recurrence value".to_string()
             )),
         }
@@ -781,15 +779,14 @@ pub async fn validate_schedule(
     if let Some(status) = &validation_data.status {
         match status.as_str() {
             "Active" | "Inactive" | "Pending" => {},
-            _ => return Err(ApiErrorType::Validation(
+            _ => return Err(AppError::Validation(
                 "Invalid status value".to_string()
             )),
         }
     }
     
     // Check for schedule conflicts
-    let existing_schedules = storage.get_menu_schedules()
-        .map_err(ApiErrorType::Storage)?;
+    let existing_schedules = storage.get_menu_schedules().map_storage_err()?;
     
     let mut conflicts = Vec::new();
     let schedule_id = validation_data.schedule_id;

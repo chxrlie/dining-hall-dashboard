@@ -2,6 +2,7 @@ mod auth;
 mod handlers;
 mod storage;
 mod scheduler;
+mod error_handler;
 
 use std::error::Error;
 use actix_web::{web, App, HttpServer};
@@ -20,10 +21,10 @@ use crate::scheduler::start_scheduler;
 async fn main() -> Result<(), Box<dyn Error>> {
     // Initialize logging
     env_logger::init();
-    println!("DEBUG: Starting main function");
+    log::debug!("Starting main function");
 
-    println!("Initializing JSON storage system...");
-    println!("DEBUG: About to call JsonStorage::new()");
+    log::info!("Initializing JSON storage system...");
+    log::debug!("About to call JsonStorage::new()");
 
     // Initialize storage with file paths
     let storage = JsonStorage::new(
@@ -33,40 +34,40 @@ async fn main() -> Result<(), Box<dyn Error>> {
         "data/menu_presets.json",
         "data/menu_schedules.json",
     )?;
-    println!("DEBUG: JsonStorage::new() completed successfully");
-    println!("Storage initialized successfully!");
+    log::debug!("JsonStorage::new() completed successfully");
+    log::info!("Storage initialized successfully!");
 
     // Wrap storage in web::Data for Actix-web
-    println!("DEBUG: Wrapping storage in web::Data");
+    log::debug!("Wrapping storage in web::Data");
     let storage_data = web::Data::new(storage);
-    println!("DEBUG: Storage wrapped successfully");
+    log::debug!("Storage wrapped successfully");
 
     // Create default admin user if none exists
-    println!("DEBUG: About to call create_default_admin()");
+    log::debug!("About to call create_default_admin()");
     create_default_admin(storage_data.clone()).await?;
-    println!("DEBUG: create_default_admin() completed successfully");
+    log::debug!("create_default_admin() completed successfully");
     
     // Start the scheduler service
-    println!("DEBUG: Starting scheduler service");
+    log::debug!("Starting scheduler service");
     start_scheduler(storage_data.clone()).await;
-    println!("DEBUG: Scheduler service started");
+    log::debug!("Scheduler service started");
 
     // Initialize Tera templates
-    println!("DEBUG: Initializing Tera templates");
+    log::debug!("Initializing Tera templates");
     let tera = Tera::new("templates/**/*").expect("Failed to initialize Tera templates");
     let tera_data = web::Data::new(tera);
-    println!("DEBUG: Tera templates initialized");
+    log::debug!("Tera templates initialized");
 
     // Create session key (in production, use a proper persistent secret key)
     // For development, use a fixed key to maintain sessions across restarts
     let secret_key = Key::from(&[0; 64]); // Fixed key for development
-    println!("DEBUG: Using fixed session key for development");
+    log::debug!("Using fixed session key for development");
 
-    println!("DEBUG: About to configure HttpServer");
-    println!("Starting Actix-web server on http://localhost:8080");
+    log::debug!("About to configure HttpServer");
+    log::info!("Starting Actix-web server on http://localhost:8080");
 
     HttpServer::new(move || {
-        println!("DEBUG: Inside HttpServer closure");
+        log::debug!("Inside HttpServer closure");
         App::new()
             .app_data(storage_data.clone())
             .app_data(tera_data.clone())
@@ -130,7 +131,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     .bind("127.0.0.1:8080")?
     .run()
     .await?;
-    println!("DEBUG: Server started successfully");
+    log::debug!("Server started successfully");
 
     Ok(())
 }

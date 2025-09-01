@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use uuid::Uuid;
 use chrono::{DateTime, Utc};
+use crate::error_handler::AppError;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct MenuItem {
@@ -92,6 +93,16 @@ pub enum StorageError {
     PoisonError,
 }
 
+impl From<StorageError> for AppError {
+    fn from(storage_error: StorageError) -> Self {
+        match storage_error {
+            StorageError::Io(io_error) => AppError::Storage(io_error.to_string()),
+            StorageError::Json(json_error) => AppError::Storage(json_error.to_string()),
+            StorageError::PoisonError => AppError::Storage("Poison error".to_string()),
+        }
+    }
+}
+
 pub struct JsonStorage {
     menu_items: Arc<Mutex<Vec<MenuItem>>>,
     notices: Arc<Mutex<Vec<Notice>>>,
@@ -113,12 +124,12 @@ impl JsonStorage {
         menu_presets_path: &str,
         menu_schedules_path: &str,
     ) -> Result<Self, StorageError> {
-        println!("DEBUG: JsonStorage::new() started");
+        log::debug!("JsonStorage::new() started");
         
         // Ensure data directory exists
         let data_dir = Path::new(menu_items_path).parent().unwrap_or(Path::new("."));
         if !data_dir.exists() {
-            println!("DEBUG: Creating data directory: {:?}", data_dir);
+            log::debug!("Creating data directory: {:?}", data_dir);
             fs::create_dir_all(data_dir)?;
         }
 
@@ -143,49 +154,49 @@ impl JsonStorage {
         };
 
         // Load existing data or create empty files
-        println!("DEBUG: Loading menu items...");
+        log::debug!("Loading menu items...");
         storage.load_menu_items()?;
-        println!("DEBUG: Menu items loaded successfully");
+        log::debug!("Menu items loaded successfully");
         
-        println!("DEBUG: Loading notices...");
+        log::debug!("Loading notices...");
         storage.load_notices()?;
-        println!("DEBUG: Notices loaded successfully");
+        log::debug!("Notices loaded successfully");
         
-        println!("DEBUG: Loading admin users...");
+        log::debug!("Loading admin users...");
         storage.load_admin_users()?;
-        println!("DEBUG: Admin users loaded successfully");
+        log::debug!("Admin users loaded successfully");
         
-        println!("DEBUG: Loading menu presets...");
+        log::debug!("Loading menu presets...");
         storage.load_menu_presets()?;
-        println!("DEBUG: Menu presets loaded successfully");
+        log::debug!("Menu presets loaded successfully");
         
-        println!("DEBUG: Loading menu schedules...");
+        log::debug!("Loading menu schedules...");
         storage.load_menu_schedules()?;
-        println!("DEBUG: Menu schedules loaded successfully");
+        log::debug!("Menu schedules loaded successfully");
 
-        println!("DEBUG: JsonStorage::new() completed");
+        log::debug!("JsonStorage::new() completed");
         Ok(storage)
     }
 
     pub fn load_menu_items(&mut self) -> Result<(), StorageError> {
-        println!("DEBUG: load_menu_items() started for path: {}", self.menu_items_path);
+        log::debug!("load_menu_items() started for path: {}", self.menu_items_path);
         let path = Path::new(&self.menu_items_path);
         if !path.exists() {
-            println!("DEBUG: Creating empty menu items file");
+            log::debug!("Creating empty menu items file");
             // Create empty file with empty array
             let empty_vec: Vec<MenuItem> = Vec::new();
             let json_data = serde_json::to_string_pretty(&empty_vec)?;
             fs::write(path, json_data)?;
         }
 
-        println!("DEBUG: Reading menu items file");
+        log::debug!("Reading menu items file");
         let file_content = fs::read_to_string(path)?;
         let items: Vec<MenuItem> = serde_json::from_str(&file_content)?;
         
-        println!("DEBUG: Acquiring menu items mutex");
+        log::debug!("Acquiring menu items mutex");
         let mut menu_items = self.menu_items.lock().map_err(|_| StorageError::PoisonError)?;
         *menu_items = items;
-        println!("DEBUG: Menu items loaded: {} items", menu_items.len());
+        log::debug!("Menu items loaded: {} items", menu_items.len());
 
         Ok(())
     }
@@ -198,47 +209,47 @@ impl JsonStorage {
     }
 
     pub fn load_notices(&mut self) -> Result<(), StorageError> {
-        println!("DEBUG: load_notices() started for path: {}", self.notices_path);
+        log::debug!("load_notices() started for path: {}", self.notices_path);
         let path = Path::new(&self.notices_path);
         if !path.exists() {
-            println!("DEBUG: Creating empty notices file");
+            log::debug!("Creating empty notices file");
             // Create empty file with empty array
             let empty_vec: Vec<Notice> = Vec::new();
             let json_data = serde_json::to_string_pretty(&empty_vec)?;
             fs::write(path, json_data)?;
         }
 
-        println!("DEBUG: Reading notices file");
+        log::debug!("Reading notices file");
         let file_content = fs::read_to_string(path)?;
         let notices: Vec<Notice> = serde_json::from_str(&file_content)?;
         
-        println!("DEBUG: Acquiring notices mutex");
+        log::debug!("Acquiring notices mutex");
         let mut notices_lock = self.notices.lock().map_err(|_| StorageError::PoisonError)?;
         *notices_lock = notices;
-        println!("DEBUG: Notices loaded: {} items", notices_lock.len());
+        log::debug!("Notices loaded: {} items", notices_lock.len());
 
         Ok(())
     }
 
     pub fn load_admin_users(&mut self) -> Result<(), StorageError> {
-        println!("DEBUG: load_admin_users() started for path: {}", self.admin_users_path);
+        log::debug!("load_admin_users() started for path: {}", self.admin_users_path);
         let path = Path::new(&self.admin_users_path);
         if !path.exists() {
-            println!("DEBUG: Creating empty admin users file");
+            log::debug!("Creating empty admin users file");
             // Create empty file with empty array
             let empty_vec: Vec<AdminUser> = Vec::new();
             let json_data = serde_json::to_string_pretty(&empty_vec)?;
             fs::write(path, json_data)?;
         }
 
-        println!("DEBUG: Reading admin users file");
+        log::debug!("Reading admin users file");
         let file_content = fs::read_to_string(path)?;
         let users: Vec<AdminUser> = serde_json::from_str(&file_content)?;
         
-        println!("DEBUG: Acquiring admin users mutex");
+        log::debug!("Acquiring admin users mutex");
         let mut admin_users_lock = self.admin_users.lock().map_err(|_| StorageError::PoisonError)?;
         *admin_users_lock = users;
-        println!("DEBUG: Admin users loaded: {} users", admin_users_lock.len());
+        log::debug!("Admin users loaded: {} users", admin_users_lock.len());
 
         Ok(())
     }
@@ -251,58 +262,58 @@ impl JsonStorage {
     }
 
     pub fn save_admin_users(&self) -> Result<(), StorageError> {
-        println!("DEBUG: save_admin_users() started");
+        log::debug!("save_admin_users() started");
         let admin_users = self.admin_users.lock().map_err(|_| StorageError::PoisonError)?;
-        println!("DEBUG: Admin users mutex acquired for saving");
+        log::debug!("Admin users mutex acquired for saving");
         let json_data = serde_json::to_string_pretty(&*admin_users)?;
-        println!("DEBUG: JSON serialization completed");
+        log::debug!("JSON serialization completed");
         fs::write(&self.admin_users_path, json_data)?;
-        println!("DEBUG: File write completed");
+        log::debug!("File write completed");
         Ok(())
     }
 
     pub fn load_menu_presets(&mut self) -> Result<(), StorageError> {
-        println!("DEBUG: load_menu_presets() started for path: {}", self.menu_presets_path);
+        log::debug!("load_menu_presets() started for path: {}", self.menu_presets_path);
         let path = Path::new(&self.menu_presets_path);
         if !path.exists() {
-            println!("DEBUG: Creating empty menu presets file");
+            log::debug!("Creating empty menu presets file");
             // Create empty file with empty array
             let empty_vec: Vec<MenuPreset> = Vec::new();
             let json_data = serde_json::to_string_pretty(&empty_vec)?;
             fs::write(path, json_data)?;
         }
 
-        println!("DEBUG: Reading menu presets file");
+        log::debug!("Reading menu presets file");
         let file_content = fs::read_to_string(path)?;
         let presets: Vec<MenuPreset> = serde_json::from_str(&file_content)?;
         
-        println!("DEBUG: Acquiring menu presets mutex");
+        log::debug!("Acquiring menu presets mutex");
         let mut menu_presets = self.menu_presets.lock().map_err(|_| StorageError::PoisonError)?;
         *menu_presets = presets;
-        println!("DEBUG: Menu presets loaded: {} items", menu_presets.len());
+        log::debug!("Menu presets loaded: {} items", menu_presets.len());
 
         Ok(())
     }
 
     pub fn load_menu_schedules(&mut self) -> Result<(), StorageError> {
-        println!("DEBUG: load_menu_schedules() started for path: {}", self.menu_schedules_path);
+        log::debug!("load_menu_schedules() started for path: {}", self.menu_schedules_path);
         let path = Path::new(&self.menu_schedules_path);
         if !path.exists() {
-            println!("DEBUG: Creating empty menu schedules file");
+            log::debug!("Creating empty menu schedules file");
             // Create empty file with empty array
             let empty_vec: Vec<MenuSchedule> = Vec::new();
             let json_data = serde_json::to_string_pretty(&empty_vec)?;
             fs::write(path, json_data)?;
         }
 
-        println!("DEBUG: Reading menu schedules file");
+        log::debug!("Reading menu schedules file");
         let file_content = fs::read_to_string(path)?;
         let schedules: Vec<MenuSchedule> = serde_json::from_str(&file_content)?;
         
-        println!("DEBUG: Acquiring menu schedules mutex");
+        log::debug!("Acquiring menu schedules mutex");
         let mut menu_schedules = self.menu_schedules.lock().map_err(|_| StorageError::PoisonError)?;
         *menu_schedules = schedules;
-        println!("DEBUG: Menu schedules loaded: {} items", menu_schedules.len());
+        log::debug!("Menu schedules loaded: {} items", menu_schedules.len());
 
         Ok(())
     }
@@ -336,12 +347,12 @@ impl JsonStorage {
         Ok(admin_users.clone())
     }
 
-    pub fn add_menu_item(&self, item: MenuItem) -> Result<(), StorageError> {
+    pub fn add_menu_item(&self, item: MenuItem) -> Result<(), AppError> {
         let mut menu_items = self.menu_items.lock().map_err(|_| StorageError::PoisonError)?;
         menu_items.push(item);
         // Explicitly drop the lock before calling save_menu_items
         drop(menu_items);
-        self.save_menu_items()
+        self.save_menu_items().map_err(|e| AppError::from(e))
     }
 
     pub fn add_notice(&self, notice: Notice) -> Result<(), StorageError> {
@@ -352,77 +363,71 @@ impl JsonStorage {
         self.save_notices()
     }
 
-    pub fn update_menu_item(&self, id: Uuid, updated_item: MenuItem) -> Result<(), StorageError> {
-        println!("DEBUG: update_menu_item() called with id: {}, item: {:?}", id, updated_item);
-        println!("DEBUG: About to acquire menu_items lock in update_menu_item");
+    pub fn update_menu_item(&self, id: Uuid, updated_item: MenuItem) -> Result<(), AppError> {
+        log::debug!("update_menu_item() called with id: {}, item: {:?}", id, updated_item);
+        log::debug!("About to acquire menu_items lock in update_menu_item");
         let mut menu_items = self.menu_items.lock().map_err(|_| StorageError::PoisonError)?;
-        println!("DEBUG: Acquired menu_items lock in update_menu_item");
+        log::debug!("Acquired menu_items lock in update_menu_item");
         if let Some(index) = menu_items.iter().position(|item| item.id == id) {
             menu_items[index] = updated_item;
-            println!("DEBUG: Item updated in memory");
+            log::debug!("Item updated in memory");
             // Explicitly drop the lock before calling save_menu_items
             drop(menu_items);
-            println!("DEBUG: Released menu_items lock in update_menu_item");
-            println!("DEBUG: About to call save_menu_items()");
-            self.save_menu_items()?;
-            println!("DEBUG: save_menu_items() completed successfully");
+            log::debug!("Released menu_items lock in update_menu_item");
+            log::debug!("About to call save_menu_items()");
+            self.save_menu_items().map_err(|e| AppError::from(e))?;
+            log::debug!("save_menu_items() completed successfully");
             Ok(())
         } else {
             // Explicitly drop the lock before returning error
             drop(menu_items);
-            println!("DEBUG: Released menu_items lock in update_menu_item (not found)");
-            Err(StorageError::Io(io::Error::new(
-                io::ErrorKind::NotFound,
-                format!("Menu item with id {} not found", id),
-            )))
+            log::debug!("Released menu_items lock in update_menu_item (not found)");
+            Err(AppError::Storage(format!("Menu item with id {} not found", id)))
         }
     }
 
-    pub fn delete_menu_item(&self, id: Uuid) -> Result<(), StorageError> {
-        println!("DEBUG: delete_menu_item() called with id: {}", id);
-        println!("DEBUG: About to acquire menu_items lock in delete_menu_item");
+    pub fn delete_menu_item(&self, id: Uuid) -> Result<(), AppError> {
+        log::debug!("delete_menu_item() called with id: {}", id);
+        log::debug!("About to acquire menu_items lock in delete_menu_item");
         let mut menu_items = self.menu_items.lock().map_err(|_| StorageError::PoisonError)?;
-        println!("DEBUG: Acquired menu_items lock in delete_menu_item");
+        log::debug!("Acquired menu_items lock in delete_menu_item");
         if let Some(index) = menu_items.iter().position(|item| item.id == id) {
             menu_items.remove(index);
-            println!("DEBUG: Item removed from memory");
+            log::debug!("Item removed from memory");
             // Explicitly drop the lock before calling save_menu_items
             drop(menu_items);
-            println!("DEBUG: Released menu_items lock in delete_menu_item");
-            println!("DEBUG: About to call save_menu_items()");
-            self.save_menu_items()?;
-            println!("DEBUG: save_menu_items() completed successfully");
+            log::debug!("Released menu_items lock in delete_menu_item");
+            log::debug!("About to call save_menu_items()");
+            self.save_menu_items().map_err(|e| AppError::from(e))?;
+            log::debug!("save_menu_items() completed successfully");
             Ok(())
         } else {
             // Explicitly drop the lock before returning error
             drop(menu_items);
-            println!("DEBUG: Released menu_items lock in delete_menu_item (not found)");
-            Err(StorageError::Io(io::Error::new(
-                io::ErrorKind::NotFound,
-                format!("Menu item with id {} not found", id),
-            )))
+            log::debug!("Released menu_items lock in delete_menu_item (not found)");
+            Err(AppError::Storage(format!("Menu item with id {} not found", id)))
         }
     }
 
     pub fn update_notice(&self, id: Uuid, updated_notice: Notice) -> Result<(), StorageError> {
-        println!("DEBUG: update_notice() called with id: {}, notice: {:?}", id, updated_notice);
-        println!("DEBUG: About to acquire notices lock in update_notice");
+        log::debug!("update_notice() called with id: {}, notice: {:?}", id, updated_notice);
+        log::debug!("About to acquire notices lock in update_notice");
         let mut notices = self.notices.lock().map_err(|_| StorageError::PoisonError)?;
-        println!("DEBUG: Acquired notices lock in update_notice");
+        log::debug!("Acquired notices lock in update_notice");
         if let Some(index) = notices.iter().position(|notice| notice.id == id) {
             notices[index] = updated_notice;
-            println!("DEBUG: Notice updated in memory");
+            log::debug!("Notice updated in memory");
             // Explicitly drop the lock before calling save_notices
             drop(notices);
-            println!("DEBUG: Released notices lock in update_notice");
-            println!("DEBUG: About to call save_notices()");
+            log::debug!("Released notices lock in update_notice");
+            log::debug!("About to call save_notices()");
             self.save_notices()?;
-            println!("DEBUG: save_notices() completed successfully");
+            log::debug!("save_notices() completed successfully");
             Ok(())
         } else {
             // Explicitly drop the lock before returning error
             drop(notices);
-            println!("DEBUG: Released notices lock in update_notice (not found)");
+            log::debug!("Released notices lock in update_notice (not found)");
             Err(StorageError::Io(io::Error::new(
                 io::ErrorKind::NotFound,
                 format!("Notice with id {} not found", id),
@@ -431,24 +436,24 @@ impl JsonStorage {
     }
 
     pub fn delete_notice(&self, id: Uuid) -> Result<(), StorageError> {
-        println!("DEBUG: delete_notice() called with id: {}", id);
-        println!("DEBUG: About to acquire notices lock in delete_notice");
+        log::debug!("delete_notice() called with id: {}", id);
+        log::debug!("About to acquire notices lock in delete_notice");
         let mut notices = self.notices.lock().map_err(|_| StorageError::PoisonError)?;
-        println!("DEBUG: Acquired notices lock in delete_notice");
+        log::debug!("Acquired notices lock in delete_notice");
         if let Some(index) = notices.iter().position(|notice| notice.id == id) {
             notices.remove(index);
-            println!("DEBUG: Notice removed from memory");
+            log::debug!("Notice removed from memory");
             // Explicitly drop the lock before calling save_notices
             drop(notices);
-            println!("DEBUG: Released notices lock in delete_notice");
-            println!("DEBUG: About to call save_notices()");
+            log::debug!("Released notices lock in delete_notice");
+            log::debug!("About to call save_notices()");
             self.save_notices()?;
-            println!("DEBUG: save_notices() completed successfully");
+            log::debug!("save_notices() completed successfully");
             Ok(())
         } else {
             // Explicitly drop the lock before returning error
             drop(notices);
-            println!("DEBUG: Released notices lock in delete_notice (not found)");
+            log::debug!("Released notices lock in delete_notice (not found)");
             Err(StorageError::Io(io::Error::new(
                 io::ErrorKind::NotFound,
                 format!("Notice with id {} not found", id),
@@ -463,16 +468,16 @@ impl JsonStorage {
     }
 
     pub fn add_admin_user(&self, user: AdminUser) -> Result<(), StorageError> {
-        println!("DEBUG: add_admin_user() started");
+        log::debug!("add_admin_user() started");
         {
             let mut admin_users = self.admin_users.lock().map_err(|_| StorageError::PoisonError)?;
-            println!("DEBUG: Admin users mutex acquired");
+            log::debug!("Admin users mutex acquired");
             admin_users.push(user);
-            println!("DEBUG: User added to vector");
+            log::debug!("User added to vector");
         } // Lock is released here
-        println!("DEBUG: Saving admin users...");
+        log::debug!("Saving admin users...");
         self.save_admin_users()?;
-        println!("DEBUG: add_admin_user() completed successfully");
+        log::debug!("add_admin_user() completed successfully");
         Ok(())
     }
 
@@ -503,24 +508,24 @@ impl JsonStorage {
     }
 
     pub fn update_menu_preset(&self, id: Uuid, updated_preset: MenuPreset) -> Result<(), StorageError> {
-        println!("DEBUG: update_menu_preset() called with id: {}, preset: {:?}", id, updated_preset);
-        println!("DEBUG: About to acquire menu_presets lock in update_menu_preset");
+        log::debug!("update_menu_preset() called with id: {}, preset: {:?}", id, updated_preset);
+        log::debug!("About to acquire menu_presets lock in update_menu_preset");
         let mut menu_presets = self.menu_presets.lock().map_err(|_| StorageError::PoisonError)?;
-        println!("DEBUG: Acquired menu_presets lock in update_menu_preset");
+        log::debug!("Acquired menu_presets lock in update_menu_preset");
         if let Some(index) = menu_presets.iter().position(|preset| preset.id == id) {
             menu_presets[index] = updated_preset;
-            println!("DEBUG: Preset updated in memory");
+            log::debug!("Preset updated in memory");
             // Explicitly drop the lock before calling save_menu_presets
             drop(menu_presets);
-            println!("DEBUG: Released menu_presets lock in update_menu_preset");
-            println!("DEBUG: About to call save_menu_presets()");
+            log::debug!("Released menu_presets lock in update_menu_preset");
+            log::debug!("About to call save_menu_presets()");
             self.save_menu_presets()?;
-            println!("DEBUG: save_menu_presets() completed successfully");
+            log::debug!("save_menu_presets() completed successfully");
             Ok(())
         } else {
             // Explicitly drop the lock before returning error
             drop(menu_presets);
-            println!("DEBUG: Released menu_presets lock in update_menu_preset (not found)");
+            log::debug!("Released menu_presets lock in update_menu_preset (not found)");
             Err(StorageError::Io(io::Error::new(
                 io::ErrorKind::NotFound,
                 format!("Menu preset with id {} not found", id),
@@ -529,24 +534,24 @@ impl JsonStorage {
     }
 
     pub fn update_menu_schedule(&self, id: Uuid, updated_schedule: MenuSchedule) -> Result<(), StorageError> {
-        println!("DEBUG: update_menu_schedule() called with id: {}, schedule: {:?}", id, updated_schedule);
-        println!("DEBUG: About to acquire menu_schedules lock in update_menu_schedule");
+        log::debug!("update_menu_schedule() called with id: {}, schedule: {:?}", id, updated_schedule);
+        log::debug!("About to acquire menu_schedules lock in update_menu_schedule");
         let mut menu_schedules = self.menu_schedules.lock().map_err(|_| StorageError::PoisonError)?;
-        println!("DEBUG: Acquired menu_schedules lock in update_menu_schedule");
+        log::debug!("Acquired menu_schedules lock in update_menu_schedule");
         if let Some(index) = menu_schedules.iter().position(|schedule| schedule.id == id) {
             menu_schedules[index] = updated_schedule;
-            println!("DEBUG: Schedule updated in memory");
+            log::debug!("Schedule updated in memory");
             // Explicitly drop the lock before calling save_menu_schedules
             drop(menu_schedules);
-            println!("DEBUG: Released menu_schedules lock in update_menu_schedule");
-            println!("DEBUG: About to call save_menu_schedules()");
+            log::debug!("Released menu_schedules lock in update_menu_schedule");
+            log::debug!("About to call save_menu_schedules()");
             self.save_menu_schedules()?;
-            println!("DEBUG: save_menu_schedules() completed successfully");
+            log::debug!("save_menu_schedules() completed successfully");
             Ok(())
         } else {
             // Explicitly drop the lock before returning error
             drop(menu_schedules);
-            println!("DEBUG: Released menu_schedules lock in update_menu_schedule (not found)");
+            log::debug!("Released menu_schedules lock in update_menu_schedule (not found)");
             Err(StorageError::Io(io::Error::new(
                 io::ErrorKind::NotFound,
                 format!("Menu schedule with id {} not found", id),
@@ -555,24 +560,24 @@ impl JsonStorage {
     }
 
     pub fn delete_menu_preset(&self, id: Uuid) -> Result<(), StorageError> {
-        println!("DEBUG: delete_menu_preset() called with id: {}", id);
-        println!("DEBUG: About to acquire menu_presets lock in delete_menu_preset");
+        log::debug!("delete_menu_preset() called with id: {}", id);
+        log::debug!("About to acquire menu_presets lock in delete_menu_preset");
         let mut menu_presets = self.menu_presets.lock().map_err(|_| StorageError::PoisonError)?;
-        println!("DEBUG: Acquired menu_presets lock in delete_menu_preset");
+        log::debug!("Acquired menu_presets lock in delete_menu_preset");
         if let Some(index) = menu_presets.iter().position(|preset| preset.id == id) {
             menu_presets.remove(index);
-            println!("DEBUG: Preset removed from memory");
+            log::debug!("Preset removed from memory");
             // Explicitly drop the lock before calling save_menu_presets
             drop(menu_presets);
-            println!("DEBUG: Released menu_presets lock in delete_menu_preset");
-            println!("DEBUG: About to call save_menu_presets()");
+            log::debug!("Released menu_presets lock in delete_menu_preset");
+            log::debug!("About to call save_menu_presets()");
             self.save_menu_presets()?;
-            println!("DEBUG: save_menu_presets() completed successfully");
+            log::debug!("save_menu_presets() completed successfully");
             Ok(())
         } else {
             // Explicitly drop the lock before returning error
             drop(menu_presets);
-            println!("DEBUG: Released menu_presets lock in delete_menu_preset (not found)");
+            log::debug!("Released menu_presets lock in delete_menu_preset (not found)");
             Err(StorageError::Io(io::Error::new(
                 io::ErrorKind::NotFound,
                 format!("Menu preset with id {} not found", id),
@@ -581,24 +586,24 @@ impl JsonStorage {
     }
 
     pub fn delete_menu_schedule(&self, id: Uuid) -> Result<(), StorageError> {
-        println!("DEBUG: delete_menu_schedule() called with id: {}", id);
-        println!("DEBUG: About to acquire menu_schedules lock in delete_menu_schedule");
+        log::debug!("delete_menu_schedule() called with id: {}", id);
+        log::debug!("About to acquire menu_schedules lock in delete_menu_schedule");
         let mut menu_schedules = self.menu_schedules.lock().map_err(|_| StorageError::PoisonError)?;
-        println!("DEBUG: Acquired menu_schedules lock in delete_menu_schedule");
+        log::debug!("Acquired menu_schedules lock in delete_menu_schedule");
         if let Some(index) = menu_schedules.iter().position(|schedule| schedule.id == id) {
             menu_schedules.remove(index);
-            println!("DEBUG: Schedule removed from memory");
+            log::debug!("Schedule removed from memory");
             // Explicitly drop the lock before calling save_menu_schedules
             drop(menu_schedules);
-            println!("DEBUG: Released menu_schedules lock in delete_menu_schedule");
-            println!("DEBUG: About to call save_menu_schedules()");
+            log::debug!("Released menu_schedules lock in delete_menu_schedule");
+            log::debug!("About to call save_menu_schedules()");
             self.save_menu_schedules()?;
-            println!("DEBUG: save_menu_schedules() completed successfully");
+            log::debug!("save_menu_schedules() completed successfully");
             Ok(())
         } else {
             // Explicitly drop the lock before returning error
             drop(menu_schedules);
-            println!("DEBUG: Released menu_schedules lock in delete_menu_schedule (not found)");
+            log::debug!("Released menu_schedules lock in delete_menu_schedule (not found)");
             Err(StorageError::Io(io::Error::new(
                 io::ErrorKind::NotFound,
                 format!("Menu schedule with id {} not found", id),
