@@ -29,14 +29,14 @@ async fn run_scheduler(storage: Data<JsonStorage>) {
         info!("Scheduler tick: checking for due schedules");
 
         // Check and execute due schedules
-        if let Err(e) = check_and_execute_schedules(&storage) {
+        if let Err(e) = check_and_execute_schedules(&storage).await {
             error!("Error checking and executing schedules: {}", e);
         }
     }
 }
 
 /// Check all schedules and execute any that are due
-fn check_and_execute_schedules(
+async fn check_and_execute_schedules(
     storage: &Data<JsonStorage>,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     // Get all schedules
@@ -57,7 +57,7 @@ fn check_and_execute_schedules(
                 );
 
                 // Execute the schedule
-                if let Err(e) = execute_schedule(storage, schedule.clone()) {
+                if let Err(e) = execute_schedule(storage, schedule.clone()).await {
                     error!("Failed to execute schedule {}: {}", schedule.id, e);
                     // Update schedule status to Inactive
                     let mut failed_schedule = schedule.clone();
@@ -81,7 +81,7 @@ fn is_schedule_due(schedule: &MenuSchedule, now: chrono::DateTime<Utc>) -> bool 
 }
 
 /// Execute a schedule by updating menu items based on the associated preset
-fn execute_schedule(
+async fn execute_schedule(
     storage: &Data<JsonStorage>,
     mut schedule: MenuSchedule,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
