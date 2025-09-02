@@ -18,7 +18,7 @@
       "Soy",
       "Gluten"
     ],
-    "is_available": false
+    "is_available": true
   },
   {
     "id": "33333333-3333-3333-3333-333333333333",
@@ -29,7 +29,7 @@
       "Gluten",
       "Dairy"
     ],
-    "is_available": false
+    "is_available": true
   },
   {
     "id": "dddddddd-dddd-dddd-dddd-dddddddddddd",
@@ -39,7 +39,7 @@
     "allergens": [
       "Fish"
     ],
-    "is_available": false
+    "is_available": true
   },
   {
     "id": "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee",
@@ -49,7 +49,7 @@
     "allergens": [
       "Soy"
     ],
-    "is_available": false
+    "is_available": true
   },
   {
     "id": "ffffffff-ffff-ffff-ffff-ffffffffffff",
@@ -59,7 +59,7 @@
     "allergens": [
       "Dairy"
     ],
-    "is_available": false
+    "is_available": true
   },
   {
     "id": "00000000-0000-0000-0000-000000000000",
@@ -70,7 +70,7 @@
       "Gluten",
       "Dairy"
     ],
-    "is_available": false
+    "is_available": true
   },
   {
     "id": "12345678-1234-1234-1234-123456789012",
@@ -82,7 +82,7 @@
       "Dairy",
       "Eggs"
     ],
-    "is_available": false
+    "is_available": true
   },
   {
     "id": "23456789-2345-2345-2345-234567890123",
@@ -90,7 +90,7 @@
     "category": "Mains",
     "description": "Grilled lamb chops with rosemary and garlic, served with mint jus",
     "allergens": [],
-    "is_available": false
+    "is_available": true
   },
   {
     "id": "34567890-3456-3456-3456-345678901234",
@@ -113,7 +113,7 @@
       "Dairy",
       "Eggs"
     ],
-    "is_available": false
+    "is_available": true
   },
   {
     "id": "55555555-5555-5555-5555-555555555555",
@@ -171,7 +171,7 @@
       "Dairy",
       "Eggs"
     ],
-    "is_available": true
+    "is_available": false
   },
   {
     "id": "90123456-9012-9012-9012-901234567890",
@@ -353,7 +353,7 @@
     "category": "Beverages",
     "description": "Freshly squeezed lemonade with a hint of mint",
     "allergens": [],
-    "is_available": false
+    "is_available": true
   },
   {
     "id": "64567890-6456-6456-6456-645678901234",
@@ -389,6 +389,6 @@
     "category": "Beverages",
     "description": "Refreshing blend of tropical fruit juices",
     "allergens": [],
-    "is_available": false
+    "is_available": true
   }
 ]

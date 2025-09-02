@@ -5,6 +5,7 @@ endblock %} {% block content %}
   <p>
     Welcome, {{ session.username }}! Manage menu items and site notices here.
   </p>
+  <div id="status-message" class="status-message" style="display: none"></div>
 
   <!-- Menu Items Management Section -->
   <section class="management-section">
@@ -82,7 +83,20 @@ endblock %} {% block content %}
           <tr>
             <td>{{ item.name }}</td>
             <td>{{ item.category }}</td>
-            <td>{% if item.is_available %}Yes{% else %}No{% endif %}</td>
+            <td>
+              <input
+                type="checkbox"
+                class="availability-toggle"
+                data-item-id="{{ item.id }}"
+                {%
+                if
+                item.is_available
+                %}checked{%
+                endif
+                %}
+                aria-label="Toggle availability for {{ item.name }}"
+              />
+            </td>
             <td>
               <button
                 class="btn btn-secondary"
@@ -244,6 +258,100 @@ endblock %} {% block content %}
         console.error("Fetch error:", error);
         alert("Error deleting notice: " + error.message);
       }
+    }
+  }
+
+  async function toggleItemAvailability(id, isAvailable) {
+    // Show loading state
+    const checkbox = document.querySelector(`input[data-item-id="${id}"]`);
+    const statusMessage = document.getElementById("status-message");
+
+    if (checkbox) {
+      checkbox.disabled = true;
+    }
+
+    try {
+      const response = await fetch(`/api/items/${id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+        body: JSON.stringify({
+          is_available: isAvailable,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("Server error:", errorText);
+
+        // Show error message
+        if (statusMessage) {
+          statusMessage.textContent = `Error updating item availability: ${errorText}`;
+          statusMessage.className = "status-message error";
+          statusMessage.style.display = "block";
+          setTimeout(() => {
+            statusMessage.style.display = "none";
+          }, 3000);
+        } else {
+          alert("Error updating item availability: " + errorText);
+        }
+
+        // Revert the checkbox state
+        if (checkbox) {
+          checkbox.checked = !isAvailable;
+        }
+        return false;
+      }
+
+      // Parse the response to get the updated item
+      const updatedItem = await response.json();
+
+      // Show success feedback
+      if (statusMessage) {
+        statusMessage.textContent = `Item "${updatedItem.name}" availability updated successfully`;
+        statusMessage.className = "status-message success";
+        statusMessage.style.display = "block";
+        setTimeout(() => {
+          statusMessage.style.display = "none";
+        }, 3000);
+      }
+
+      if (checkbox) {
+        // Add visual feedback
+        checkbox.classList.add("update-success");
+        setTimeout(() => {
+          checkbox.classList.remove("update-success");
+        }, 1000);
+
+        // Re-enable the checkbox
+        checkbox.disabled = false;
+      }
+
+      console.log("Item availability updated successfully:", updatedItem);
+      return true;
+    } catch (error) {
+      console.error("Fetch error:", error);
+
+      // Show error message
+      if (statusMessage) {
+        statusMessage.textContent = `Error updating item availability: ${error.message}`;
+        statusMessage.className = "status-message error";
+        statusMessage.style.display = "block";
+        setTimeout(() => {
+          statusMessage.style.display = "none";
+        }, 3000);
+      } else {
+        alert("Error updating item availability: " + error.message);
+      }
+
+      // Revert the checkbox state
+      if (checkbox) {
+        checkbox.checked = !isAvailable;
+        checkbox.disabled = false;
+      }
+      return false;
     }
   }
 
@@ -515,6 +623,18 @@ endblock %} {% block content %}
     } else {
       console.error("Add notice form not found");
     }
+
+    // Add event listeners for availability toggle checkboxes
+    const availabilityToggles = document.querySelectorAll(
+      ".availability-toggle"
+    );
+    availabilityToggles.forEach((toggle) => {
+      toggle.addEventListener("change", async function () {
+        const itemId = this.getAttribute("data-item-id");
+        const isAvailable = this.checked;
+        await toggleItemAvailability(itemId, isAvailable);
+      });
+    });
   });
 </script>
 {% endblock %}
