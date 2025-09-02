@@ -501,6 +501,30 @@ footer {
   accent-color: var(--color-primary);
 }
 
+.availability-toggle.update-success {
+  accent-color: var(--color-success);
+  box-shadow: 0 0 5px var(--color-success);
+}
+
+.status-message {
+  padding: var(--spacing-sm);
+  margin-bottom: var(--spacing-md);
+  border-radius: var(--border-radius-sm);
+  text-align: center;
+  font-weight: 600;
+  transition: opacity var(--transition-base);
+}
+
+.status-message.success {
+  background-color: var(--color-success-light);
+  color: var(--color-neutral-0);
+}
+
+.status-message.error {
+  background-color: var(--color-error-light);
+  color: var(--color-neutral-0);
+}
+
 /* Tables */
 .table-container {
   overflow-x: auto;
