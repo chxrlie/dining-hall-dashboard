@@ -182,7 +182,9 @@ While this is a small application, we follow principles from:
 
 ## 🔄 Version History
 
-### v0.1.3 (Current)
+### v0.2.0 (Current)
+
+### v0.1.3
 
 - Updated Argon2 implementation
 - Enhanced session security
