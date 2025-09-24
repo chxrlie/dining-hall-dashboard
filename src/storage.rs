@@ -55,8 +55,10 @@ pub enum ScheduleRecurrence {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum ScheduleStatus {
     Active,
-    Inactive,
+    Ended,
     Pending,
+    Failed,
+    Conflicted,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -79,6 +81,7 @@ pub struct MenuSchedule {
     pub end_time: DateTime<Utc>,
     pub recurrence: ScheduleRecurrence,
     pub status: ScheduleStatus,
+    pub error_message: Option<String>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }

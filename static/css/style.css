@@ -821,7 +821,7 @@ table tr:hover {
     color: var(--color-neutral-0);
   }
 
-  .status.inactive {
+  .status.ended {
     background-color: var(--color-neutral-500);
     color: var(--color-neutral-0);
   }

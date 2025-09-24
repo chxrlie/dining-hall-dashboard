@@ -1,4 +1,5 @@
 use actix_web::{HttpResponse, Responder, web};
+use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use tera::Tera;
 use uuid::Uuid;
@@ -589,7 +590,7 @@ pub async fn create_menu_schedule(
     // Convert status string to enum
     let status = match schedule_data.status.as_str() {
         "Active" => ScheduleStatus::Active,
-        "Inactive" => ScheduleStatus::Inactive,
+        "Ended" => ScheduleStatus::Ended,
         "Pending" => ScheduleStatus::Pending,
         _ => return Err(AppError::Validation("Invalid status value".to_string())),
     };
@@ -599,20 +600,28 @@ pub async fn create_menu_schedule(
         .get_menu_schedules()
         .map_err(|e| AppError::from(e))?;
 
-    for schedule in existing_schedules {
-        if schedule.preset_id == schedule_data.preset_id
-            && ((schedule.start_time <= schedule_data.start_time
-                && schedule.end_time >= schedule_data.start_time)
-                || (schedule.start_time <= schedule_data.end_time
-                    && schedule.end_time >= schedule_data.end_time)
-                || (schedule.start_time >= schedule_data.start_time
-                    && schedule.end_time <= schedule_data.end_time))
-        {
-            return Err(AppError::Validation(format!(
-                "Schedule conflict with existing schedule id {}",
-                schedule.id
-            )));
-        }
+    // Create a temporary schedule for conflict check
+    let temp_schedule = MenuSchedule {
+        id: Uuid::new_v4(), // dummy id
+        preset_id: schedule_data.preset_id,
+        name: schedule_data.name.clone(),
+        description: schedule_data.description.clone(),
+        start_time: schedule_data.start_time,
+        end_time: schedule_data.end_time,
+        recurrence: recurrence.clone(),
+        status: status.clone(),
+        error_message: None,
+        created_at: Utc::now(),
+        updated_at: Utc::now(),
+    };
+
+    if let Some(conflicting) =
+        crate::scheduler::has_schedule_conflict(&temp_schedule, &existing_schedules)
+    {
+        return Err(AppError::Validation(format!(
+            "Schedule conflict with existing schedule '{}' ({})",
+            conflicting.name, conflicting.id
+        )));
     }
 
     let new_schedule = MenuSchedule {
@@ -624,6 +633,7 @@ pub async fn create_menu_schedule(
         end_time: schedule_data.end_time,
         recurrence,
         status,
+        error_message: None,
         created_at: Utc::now(),
         updated_at: Utc::now(),
     };
@@ -727,7 +737,7 @@ pub async fn update_menu_schedule(
     if let Some(status_str) = &update_data.status {
         let status = match status_str.as_str() {
             "Active" => ScheduleStatus::Active,
-            "Inactive" => ScheduleStatus::Inactive,
+            "Ended" => ScheduleStatus::Ended,
             "Pending" => ScheduleStatus::Pending,
             _ => return Err(AppError::Validation("Invalid status value".to_string())),
         };
@@ -735,6 +745,19 @@ pub async fn update_menu_schedule(
     }
 
     existing_schedule.updated_at = Utc::now();
+
+    // Check for schedule conflicts if start_time or end_time changed
+    if update_data.start_time.is_some() || update_data.end_time.is_some() {
+        let all_schedules = storage.get_menu_schedules().map_storage_err()?;
+        if let Some(conflicting) =
+            crate::scheduler::has_schedule_conflict(&existing_schedule, &all_schedules)
+        {
+            return Err(AppError::Validation(format!(
+                "Schedule conflict with existing schedule '{}' ({})",
+                conflicting.name, conflicting.id
+            )));
+        }
+    }
 
     storage
         .update_menu_schedule(schedule_id, existing_schedule.clone())
@@ -836,7 +859,7 @@ pub async fn validate_schedule(
     // Validate status if provided
     if let Some(status) = &validation_data.status {
         match status.as_str() {
-            "Active" | "Inactive" | "Pending" => {}
+            "Active" | "Ended" | "Pending" => {}
             _ => return Err(AppError::Validation("Invalid status value".to_string())),
         }
     }
@@ -844,35 +867,50 @@ pub async fn validate_schedule(
     // Check for schedule conflicts
     let existing_schedules = storage.get_menu_schedules().map_storage_err()?;
 
-    let mut conflicts = Vec::new();
-    let schedule_id = validation_data.schedule_id;
-
-    for schedule in existing_schedules {
-        // Skip the schedule being updated
-        if let Some(id) = schedule_id {
-            if schedule.id == id {
-                continue;
-            }
+    // Create a temporary schedule for conflict check
+    let recurrence = if let Some(rec) = &validation_data.recurrence {
+        match rec.as_str() {
+            "Daily" => ScheduleRecurrence::Daily,
+            "Weekly" => ScheduleRecurrence::Weekly,
+            "Monthly" => ScheduleRecurrence::Monthly,
+            "Custom" => ScheduleRecurrence::Custom,
+            _ => return Err(AppError::Validation("Invalid recurrence value".to_string())),
         }
+    } else {
+        ScheduleRecurrence::Custom // default
+    };
 
-        // Check for time overlap
-        if (schedule.start_time <= validation_data.start_time
-            && schedule.end_time >= validation_data.start_time)
-            || (schedule.start_time <= validation_data.end_time
-                && schedule.end_time >= validation_data.end_time)
-            || (schedule.start_time >= validation_data.start_time
-                && schedule.end_time <= validation_data.end_time)
-        {
-            // If preset_id is provided, only check conflicts with schedules that use the same preset
-            if let Some(preset_id) = validation_data.preset_id {
-                if schedule.preset_id == preset_id {
-                    conflicts.push(schedule.id);
-                }
-            } else {
-                conflicts.push(schedule.id);
-            }
+    let status = if let Some(stat) = &validation_data.status {
+        match stat.as_str() {
+            "Active" => ScheduleStatus::Active,
+            "Ended" => ScheduleStatus::Ended,
+            "Pending" => ScheduleStatus::Pending,
+            _ => return Err(AppError::Validation("Invalid status value".to_string())),
         }
-    }
+    } else {
+        ScheduleStatus::Pending // default
+    };
+
+    let temp_schedule = MenuSchedule {
+        id: validation_data.schedule_id.unwrap_or(Uuid::new_v4()),
+        preset_id: validation_data.preset_id.unwrap_or(Uuid::new_v4()), // dummy if not provided
+        name: validation_data.name.clone().unwrap_or_default(),
+        description: validation_data.description.clone().unwrap_or_default(),
+        start_time: validation_data.start_time,
+        end_time: validation_data.end_time,
+        recurrence,
+        status,
+        error_message: None,
+        created_at: Utc::now(),
+        updated_at: Utc::now(),
+    };
+
+    let conflicting = crate::scheduler::has_schedule_conflict(&temp_schedule, &existing_schedules);
+    let conflicts = if let Some(conf) = conflicting {
+        vec![conf.id]
+    } else {
+        Vec::new()
+    };
 
     #[derive(Debug, Serialize)]
     struct ValidationResponse {
