@@ -69,6 +69,10 @@ endblock %} {% block content %}
     <!-- Menu Items Table -->
     <div class="table-container">
       <h3>Existing Menu Items</h3>
+      <div class="table-actions" style="margin-bottom: var(--spacing-md);">
+        <button class="btn btn-primary" id="selectAllBtn" aria-label="Toggle all menu items" type="button">Toggle All</button>
+        <button class="btn btn-warning" id="deselectAllBtn" aria-label="Deselect all menu items" type="button">Deselect All</button>
+      </div>
       <table class="items-table">
         <thead>
           <tr>
@@ -308,17 +312,9 @@ endblock %} {% block content %}
       // Parse the response to get the updated item
       const updatedItem = await response.json();
 
-      // Show success feedback
-      if (statusMessage) {
-        statusMessage.textContent = `Item "${updatedItem.name}" availability updated successfully`;
-        statusMessage.className = "status-message success";
-        statusMessage.style.display = "block";
-        setTimeout(() => {
-          statusMessage.style.display = "none";
-        }, 3000);
-      }
-
+      // Update the checkbox state on success
       if (checkbox) {
+        checkbox.checked = isAvailable;
         // Add visual feedback
         checkbox.classList.add("update-success");
         setTimeout(() => {
@@ -327,6 +323,16 @@ endblock %} {% block content %}
 
         // Re-enable the checkbox
         checkbox.disabled = false;
+      }
+
+      // Show success feedback
+      if (statusMessage) {
+        statusMessage.textContent = `Item "${updatedItem.name}" availability updated successfully`;
+        statusMessage.className = "status-message success";
+        statusMessage.style.display = "block";
+        setTimeout(() => {
+          statusMessage.style.display = "none";
+        }, 3000);
       }
 
       console.log("Item availability updated successfully:", updatedItem);
@@ -608,6 +614,98 @@ endblock %} {% block content %}
     }
   }
 
+  async function selectAllItems() {
+    const toggles = document.querySelectorAll('.availability-toggle');
+    let selectedCount = 0;
+    const statusMessage = document.getElementById("status-message");
+    const btn = document.getElementById('selectAllBtn');
+
+    // Show loading state
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = 'Toggling...';
+    }
+
+    for (const toggle of toggles) {
+      if (!toggle.checked) {
+        const itemId = toggle.getAttribute('data-item-id');
+        const success = await toggleItemAvailability(itemId, true);
+        if (success) {
+          selectedCount++;
+          // Ensure checkbox is checked
+          toggle.checked = true;
+        }
+      }
+    }
+
+    // Show feedback
+    if (statusMessage) {
+      if (selectedCount > 0) {
+        statusMessage.textContent = `Successfully toggled ${selectedCount} item(s)`;
+        statusMessage.className = "status-message success";
+      } else {
+        statusMessage.textContent = "All items are already selected";
+        statusMessage.className = "status-message error";
+      }
+      statusMessage.style.display = "block";
+      setTimeout(() => {
+        statusMessage.style.display = "none";
+      }, 3000);
+    }
+
+    // Re-enable button
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = 'Toggle All';
+    }
+  }
+
+  async function deselectAllItems() {
+    const toggles = document.querySelectorAll('.availability-toggle');
+    let deselectedCount = 0;
+    const statusMessage = document.getElementById("status-message");
+    const btn = document.getElementById('deselectAllBtn');
+
+    // Show loading state
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = 'Deselecting...';
+    }
+
+    for (const toggle of toggles) {
+      if (toggle.checked) {
+        const itemId = toggle.getAttribute('data-item-id');
+        const success = await toggleItemAvailability(itemId, false);
+        if (success) {
+          deselectedCount++;
+          // Ensure checkbox is unchecked
+          toggle.checked = false;
+        }
+      }
+    }
+
+    // Show feedback
+    if (statusMessage) {
+      if (deselectedCount > 0) {
+        statusMessage.textContent = `Successfully deselected ${deselectedCount} item(s)`;
+        statusMessage.className = "status-message success";
+      } else {
+        statusMessage.textContent = "No items were selected to deselect";
+        statusMessage.className = "status-message error";
+      }
+      statusMessage.style.display = "block";
+      setTimeout(() => {
+        statusMessage.style.display = "none";
+      }, 3000);
+    }
+
+    // Re-enable button
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = 'Deselect All';
+    }
+  }
+
   // Add event listeners with error handling
   document.addEventListener("DOMContentLoaded", function () {
     const addMenuItemForm = document.getElementById("addMenuItemForm");
@@ -622,6 +720,22 @@ endblock %} {% block content %}
       addNoticeForm.addEventListener("submit", addNoticeFormHandler);
     } else {
       console.error("Add notice form not found");
+    }
+
+    // Add event listener for select all button
+    const selectAllBtn = document.getElementById("selectAllBtn");
+    if (selectAllBtn) {
+      selectAllBtn.addEventListener("click", selectAllItems);
+    } else {
+      console.error("Select all button not found");
+    }
+
+    // Add event listener for deselect all button
+    const deselectAllBtn = document.getElementById("deselectAllBtn");
+    if (deselectAllBtn) {
+      deselectAllBtn.addEventListener("click", deselectAllItems);
+    } else {
+      console.error("Deselect all button not found");
     }
 
     // Add event listeners for availability toggle checkboxes

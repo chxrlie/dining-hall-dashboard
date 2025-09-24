@@ -142,7 +142,7 @@ impl JsonStorage {
         let menu_presets = Arc::new(Mutex::new(Vec::new()));
         let menu_schedules = Arc::new(Mutex::new(Vec::new()));
 
-        let mut storage = Self {
+        let storage = Self {
             menu_items,
             notices,
             admin_users,
