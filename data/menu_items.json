@@ -7,7 +7,7 @@
     "allergens": [
       "Soy"
     ],
-    "is_available": false
+    "is_available": true
   },
   {
     "id": "22222222-2222-2222-2222-222222222222",
@@ -18,7 +18,7 @@
       "Soy",
       "Gluten"
     ],
-    "is_available": true
+    "is_available": false
   },
   {
     "id": "33333333-3333-3333-3333-333333333333",
@@ -29,7 +29,7 @@
       "Gluten",
       "Dairy"
     ],
-    "is_available": true
+    "is_available": false
   },
   {
     "id": "dddddddd-dddd-dddd-dddd-dddddddddddd",
@@ -39,7 +39,7 @@
     "allergens": [
       "Fish"
     ],
-    "is_available": true
+    "is_available": false
   },
   {
     "id": "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee",
@@ -49,7 +49,7 @@
     "allergens": [
       "Soy"
     ],
-    "is_available": true
+    "is_available": false
   },
   {
     "id": "ffffffff-ffff-ffff-ffff-ffffffffffff",
@@ -59,7 +59,7 @@
     "allergens": [
       "Dairy"
     ],
-    "is_available": true
+    "is_available": false
   },
   {
     "id": "00000000-0000-0000-0000-000000000000",
@@ -70,7 +70,7 @@
       "Gluten",
       "Dairy"
     ],
-    "is_available": true
+    "is_available": false
   },
   {
     "id": "12345678-1234-1234-1234-123456789012",
@@ -82,7 +82,7 @@
       "Dairy",
       "Eggs"
     ],
-    "is_available": true
+    "is_available": false
   },
   {
     "id": "23456789-2345-2345-2345-234567890123",
@@ -90,7 +90,7 @@
     "category": "Mains",
     "description": "Grilled lamb chops with rosemary and garlic, served with mint jus",
     "allergens": [],
-    "is_available": true
+    "is_available": false
   },
   {
     "id": "34567890-3456-3456-3456-345678901234",
@@ -101,7 +101,7 @@
       "Fish",
       "Gluten"
     ],
-    "is_available": true
+    "is_available": false
   },
   {
     "id": "44444444-4444-4444-4444-444444444444",
@@ -124,7 +124,7 @@
       "Gluten",
       "Dairy"
     ],
-    "is_available": true
+    "is_available": false
   },
   {
     "id": "66666666-6666-6666-6666-666666666666",
@@ -132,7 +132,7 @@
     "category": "Sides",
     "description": "Crispy golden french fries with salt",
     "allergens": [],
-    "is_available": true
+    "is_available": false
   },
   {
     "id": "56789012-5678-5678-5678-567890123456",
@@ -150,7 +150,7 @@
     "category": "Sides",
     "description": "Seasonal vegetables roasted with olive oil and herbs",
     "allergens": [],
-    "is_available": false
+    "is_available": true
   },
   {
     "id": "78901234-7890-7890-7890-789012345678",
@@ -217,7 +217,7 @@
     "category": "Desserts",
     "description": "Seasonal fresh fruit salad",
     "allergens": [],
-    "is_available": false
+    "is_available": true
   },
   {
     "id": "99999999-9999-9999-9999-999999999999",
@@ -327,7 +327,7 @@
     "category": "Beverages",
     "description": "Refreshing sparkling water with lemon",
     "allergens": [],
-    "is_available": true
+    "is_available": false
   },
   {
     "id": "91234567-9123-9123-9123-912345678901",
@@ -353,7 +353,7 @@
     "category": "Beverages",
     "description": "Freshly squeezed lemonade with a hint of mint",
     "allergens": [],
-    "is_available": true
+    "is_available": false
   },
   {
     "id": "64567890-6456-6456-6456-645678901234",
