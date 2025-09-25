@@ -64,7 +64,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     log::debug!("Using fixed session key for development");
 
     log::debug!("About to configure HttpServer");
-    log::info!("Starting Actix-web server on http://localhost:80");
+    log::info!("Starting Actix-web server on http://localhost:8080");
 
     HttpServer::new(move || {
         log::debug!("Inside HttpServer closure");
@@ -187,7 +187,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
             // Public menu page
             .route("/menu", web::get().to(handlers::menu_page))
     })
-    .bind("0.0.0.0:80")?
+    .bind("0.0.0.0:8080")?
     .run()
     .await?;
     log::debug!("Server started successfully");
