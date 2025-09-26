@@ -330,9 +330,21 @@ pub async fn delete_notice(
 }
 
 // Login page handler
-pub async fn login_page(tera: web::Data<Tera>) -> Result<HttpResponse, ApiErrorType> {
+pub async fn login_page(
+    tera: web::Data<Tera>,
+    session: actix_session::Session,
+) -> Result<HttpResponse, ApiErrorType> {
     println!("DEBUG: login_page handler called");
 
+    // Check if user is already logged in
+    if let Ok(Some(_user_id)) = session.get::<Uuid>("user_id") {
+        // If logged in, redirect to the admin dashboard
+        return Ok(HttpResponse::SeeOther()
+            .insert_header(("Location", "/admin"))
+            .finish());
+    }
+
+    // If not logged in, render the login page
     let rendered = tera
         .render("admin/login.html", &tera::Context::new())
         .map_err(|e| ApiErrorType::Validation(format!("Template error: {}", e)))?;
@@ -1012,7 +1024,6 @@ pub async fn menu_item_page(
     }
 }
 
-
 // Menu Schedules Page Handler
 pub async fn menu_schedules_page(
     storage: web::Data<JsonStorage>,
@@ -1209,11 +1220,7 @@ pub async fn not_found_page(
         .unwrap_or("Not available")
         .to_string();
 
-    log::warn!(
-        "Page not found for path: {}. Referrer: {}",
-        path,
-        referrer
-    );
+    log::warn!("Page not found for path: {}. Referrer: {}", path, referrer);
 
     context.insert("path", &path);
     context.insert("referrer", &referrer);
