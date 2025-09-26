@@ -218,8 +218,17 @@ impl JsonStorage {
             .lock()
             .map_err(|_| StorageError::PoisonError)?;
         let json_data = serde_json::to_string_pretty(&*menu_items)?;
-        fs::write(&self.menu_items_path, json_data)?;
-        Ok(())
+        match fs::write(&self.menu_items_path, json_data) {
+            Ok(_) => Ok(()),
+            Err(e) => {
+                log::error!(
+                    "Failed to write to {}: {}",
+                    &self.menu_items_path,
+                    e
+                );
+                Err(e.into())
+            }
+        }
     }
 
     pub fn load_notices(&self) -> Result<(), StorageError> {
@@ -277,8 +286,17 @@ impl JsonStorage {
     pub fn save_notices(&self) -> Result<(), StorageError> {
         let notices = self.notices.lock().map_err(|_| StorageError::PoisonError)?;
         let json_data = serde_json::to_string_pretty(&*notices)?;
-        fs::write(&self.notices_path, json_data)?;
-        Ok(())
+        match fs::write(&self.notices_path, json_data) {
+            Ok(_) => Ok(()),
+            Err(e) => {
+                log::error!(
+                    "Failed to write to {}: {}",
+                    &self.notices_path,
+                    e
+                );
+                Err(e.into())
+            }
+        }
     }
 
     pub fn save_admin_users(&self) -> Result<(), StorageError> {
@@ -290,9 +308,20 @@ impl JsonStorage {
         log::debug!("Admin users mutex acquired for saving");
         let json_data = serde_json::to_string_pretty(&*admin_users)?;
         log::debug!("JSON serialization completed");
-        fs::write(&self.admin_users_path, json_data)?;
-        log::debug!("File write completed");
-        Ok(())
+        match fs::write(&self.admin_users_path, json_data) {
+            Ok(_) => {
+                log::debug!("File write completed");
+                Ok(())
+            }
+            Err(e) => {
+                log::error!(
+                    "Failed to write to {}: {}",
+                    &self.admin_users_path,
+                    e
+                );
+                Err(e.into())
+            }
+        }
     }
 
     pub fn load_menu_presets(&self) -> Result<(), StorageError> {
@@ -359,8 +388,17 @@ impl JsonStorage {
             .lock()
             .map_err(|_| StorageError::PoisonError)?;
         let json_data = serde_json::to_string_pretty(&*menu_presets)?;
-        fs::write(&self.menu_presets_path, json_data)?;
-        Ok(())
+        match fs::write(&self.menu_presets_path, json_data) {
+            Ok(_) => Ok(()),
+            Err(e) => {
+                log::error!(
+                    "Failed to write to {}: {}",
+                    &self.menu_presets_path,
+                    e
+                );
+                Err(e.into())
+            }
+        }
     }
 
     pub fn save_menu_schedules(&self) -> Result<(), StorageError> {
@@ -369,8 +407,17 @@ impl JsonStorage {
             .lock()
             .map_err(|_| StorageError::PoisonError)?;
         let json_data = serde_json::to_string_pretty(&*menu_schedules)?;
-        fs::write(&self.menu_schedules_path, json_data)?;
-        Ok(())
+        match fs::write(&self.menu_schedules_path, json_data) {
+            Ok(_) => Ok(()),
+            Err(e) => {
+                log::error!(
+                    "Failed to write to {}: {}",
+                    &self.menu_schedules_path,
+                    e
+                );
+                Err(e.into())
+            }
+        }
     }
 
     pub fn get_menu_items(&self) -> Result<Vec<MenuItem>, StorageError> {
