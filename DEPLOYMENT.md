@@ -12,7 +12,7 @@ This guide provides instructions for deploying the Dining Hall Dashboard in a pr
 - **RAM**: 512 MB
 - **Disk Space**: 100 MB for application, additional space for data
 - **Operating System**: Linux (Ubuntu 20.04+, CentOS 8+, Debian 10+) or Windows Server 2019+
-- **Rust**: 1.70 or higher
+- **Rust**: 2024 edition or higher
 
 ### Recommended Requirements
 
@@ -517,4 +517,4 @@ For deployment issues or questions:
 
 - Check the documentation
 - File an issue on GitHub
-- Contact chxrlie@charlimit.com
+- Contact charlie@charlimit.com
