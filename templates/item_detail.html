@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+
+{% block title %}{{ item.name }}{% endblock title %}
+
+{% block content %}
+<div class="container">
+    <div class="menu-item-detail">
+        <h1>{{ item.name }}</h1>
+        <p><strong>Category:</strong> {{ item.category }}</p>
+        <p><strong>Description:</strong> {{ item.description }}</p>
+        <p><strong>Allergens:</strong> {{ item.allergens | join(sep=", ") }}</p>
+        <p><a href="/menu">Back to menu</a></p>
+        <p><small>Referred from: {{ referrer }}</small></p>
+    </div>
+</div>
+{% endblock content %}

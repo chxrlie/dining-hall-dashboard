@@ -12,7 +12,7 @@ use actix_session::SessionMiddleware;
 use actix_session::storage::CookieSessionStore;
 use actix_web::cookie::Key;
 use actix_web::middleware::Logger;
-use actix_web::{App, HttpServer, web};
+use actix_web::{App, HttpServer, web, HttpResponse};
 use std::error::Error;
 use storage::JsonStorage;
 use tera::Tera;
@@ -186,6 +186,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
             .service(Files::new("/static", "./static").show_files_listing())
             // Public menu page
             .route("/menu", web::get().to(handlers::menu_page))
+            .route("/menu/item/{id}", web::get().to(handlers::menu_item_page))
+            // Add a redirect from / to /menu
+            .route("/", web::get().to(|| async { HttpResponse::Found().append_header(("Location", "/menu")).finish() }))
+            .default_service(web::to(handlers::not_found_page))
     })
     .bind("0.0.0.0:8080")?
     .run()

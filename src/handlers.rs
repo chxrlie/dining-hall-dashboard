@@ -1,4 +1,4 @@
-use actix_web::{HttpResponse, Responder, web};
+use actix_web::{HttpRequest, HttpResponse, Responder, web};
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use tera::Tera;
@@ -935,10 +935,18 @@ pub async fn validate_schedule(
 
 // Public Menu Display Handler
 pub async fn menu_page(
+    req: HttpRequest,
     storage: web::Data<JsonStorage>,
     tera: web::Data<Tera>,
 ) -> Result<HttpResponse, ApiErrorType> {
     println!("DEBUG: menu_page handler called");
+
+    // Log the referrer for analytics
+    if let Some(referrer) = req.headers().get("Referer") {
+        if let Ok(referrer_str) = referrer.to_str() {
+            println!("DEBUG: Referrer: {}", referrer_str);
+        }
+    }
 
     // Get menu items and filter for available ones
     let menu_items = storage.get_menu_items().map_err(ApiErrorType::Storage)?;
@@ -961,6 +969,49 @@ pub async fn menu_page(
 
     Ok(HttpResponse::Ok().content_type("text/html").body(rendered))
 }
+
+// Individual Menu Item Page Handler
+pub async fn menu_item_page(
+    req: HttpRequest,
+    storage: web::Data<JsonStorage>,
+    tera: web::Data<Tera>,
+    path: web::Path<Uuid>,
+) -> Result<HttpResponse, ApiErrorType> {
+    let item_id = path.into_inner();
+    let referrer = req
+        .headers()
+        .get("referer")
+        .and_then(|h| h.to_str().ok())
+        .unwrap_or("Not available")
+        .to_string();
+
+    log::info!(
+        "Accessing menu item page for item_id: {}. Referrer: {}",
+        item_id,
+        referrer
+    );
+
+    let menu_items = storage.get_menu_items().map_err(ApiErrorType::Storage)?;
+    let item = menu_items.iter().find(|item| item.id == item_id);
+
+    if let Some(item) = item {
+        let mut context = tera::Context::new();
+        context.insert("item", &item);
+        context.insert("referrer", &referrer);
+
+        let rendered = tera
+            .render("item_detail.html", &context)
+            .map_err(|e| ApiErrorType::Validation(format!("Template error: {}", e)))?;
+
+        Ok(HttpResponse::Ok().content_type("text/html").body(rendered))
+    } else {
+        Err(ApiErrorType::NotFound(format!(
+            "Menu item with id {} not found",
+            item_id
+        )))
+    }
+}
+
 
 // Menu Schedules Page Handler
 pub async fn menu_schedules_page(
@@ -1137,10 +1188,39 @@ pub async fn menu_presets_page(
         );
     }
 
-    // Render the template
     let rendered = tera
         .render("admin/presets.html", &context)
         .map_err(|e| ApiErrorType::Validation(format!("Template error: {}", e)))?;
 
     Ok(HttpResponse::Ok().content_type("text/html").body(rendered))
+}
+
+// 404 Not Found Page Handler
+pub async fn not_found_page(
+    tmpl: web::Data<Tera>,
+    req: HttpRequest,
+) -> Result<HttpResponse, actix_web::Error> {
+    let mut context = tera::Context::new();
+    let path = req.path().to_string();
+    let referrer = req
+        .headers()
+        .get("referer")
+        .and_then(|h| h.to_str().ok())
+        .unwrap_or("Not available")
+        .to_string();
+
+    log::warn!(
+        "Page not found for path: {}. Referrer: {}",
+        path,
+        referrer
+    );
+
+    context.insert("path", &path);
+    context.insert("referrer", &referrer);
+
+    let s = tmpl
+        .render("404.html", &context)
+        .map_err(actix_web::error::ErrorInternalServerError)?;
+
+    Ok(HttpResponse::NotFound().body(s))
 }
