@@ -16,12 +16,50 @@ use actix_web::{App, HttpResponse, HttpServer, web};
 use std::error::Error;
 use storage::JsonStorage;
 use tera::Tera;
+use std::fs;
+use std::path::Path;
+
+fn check_data_directory_permissions() -> Result<(), Box<dyn Error>> {
+    let data_dir = Path::new("data");
+    if !data_dir.exists() {
+        fs::create_dir_all(data_dir)?;
+    }
+    let test_file_path = data_dir.join(".perm_check");
+    match fs::write(&test_file_path, "test") {
+        Ok(_) => {
+            if let Err(e) = fs::remove_file(&test_file_path) {
+                log::warn!("Failed to remove permission check file: {}", e);
+            }
+            Ok(())
+        }
+        Err(e) => {
+            if e.kind() == std::io::ErrorKind::PermissionDenied {
+                let error_message = format!(
+                    "Error: Insufficient permissions to write to the 'data' directory.\n\
+                    Please ensure the application has write access to this directory.\n\
+                    On Windows, you can grant access by running:\n\
+                    icacls \"data\" /grant \"%USERNAME%\":(F)\" /T"
+                );
+                Err(error_message.into())
+            } else {
+                Err(e.into())
+            }
+        }
+    }
+}
 
 #[actix_web::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     // Initialize logging
     env_logger::init();
     log::debug!("Starting main function");
+
+    // Check for write permissions before proceeding
+    if let Err(e) = check_data_directory_permissions() {
+        eprintln!("{}", e);
+        // Use a dedicated exit code for permission errors
+        std::process::exit(1);
+    }
 
     log::info!("Initializing JSON storage system...");
     log::debug!("About to call JsonStorage::new()");

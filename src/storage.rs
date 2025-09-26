@@ -89,11 +89,23 @@ pub struct MenuSchedule {
 #[derive(Error, Debug)]
 pub enum StorageError {
     #[error("IO error: {0}")]
-    Io(#[from] io::Error),
+    Io(io::Error),
     #[error("JSON serialization error: {0}")]
     Json(#[from] serde_json::Error),
     #[error("Mutex poison error")]
     PoisonError,
+    #[error("Permission denied: {0}. Please ensure the application has write access to the data directory.")]
+    PermissionDenied(String),
+}
+
+impl From<io::Error> for StorageError {
+    fn from(error: io::Error) -> Self {
+        if error.kind() == io::ErrorKind::PermissionDenied {
+            StorageError::PermissionDenied(error.to_string())
+        } else {
+            StorageError::Io(error)
+        }
+    }
 }
 
 impl From<StorageError> for AppError {
@@ -101,7 +113,8 @@ impl From<StorageError> for AppError {
         match storage_error {
             StorageError::Io(io_error) => AppError::Storage(io_error.to_string()),
             StorageError::Json(json_error) => AppError::Storage(json_error.to_string()),
-            StorageError::PoisonError => AppError::Storage("Poison error".to_string()),
+            StorageError::PoisonError => AppError::Storage("Mutex poison error".to_string()),
+            StorageError::PermissionDenied(msg) => AppError::Storage(msg),
         }
     }
 }

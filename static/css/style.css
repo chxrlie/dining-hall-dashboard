@@ -669,7 +669,7 @@ table tr:hover {
 }
 
 .notice-item h3 {
-  color: var(--color-info-light);
+  color: var(--color-info);
   margin-top: 0;
   margin-bottom: var(--spacing-xs);
 }

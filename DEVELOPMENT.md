@@ -1,5 +1,17 @@
 # 🛠️ Development Guide
 
+## Initial Setup
+
+Before running the application for the first time, you need to ensure that the `data` directory has the correct permissions. The application needs to be able to write to this directory to store its data.
+
+On Windows, you can set the correct permissions by running the following command in the project's root directory:
+
+```bash
+icacls "data" /grant "%USERNAME%":(F) /T
+```
+
+This command grants your user account full control over the `data` directory and all of its contents.
+
 ### Building for Production
 
 ```bash
