@@ -118,9 +118,9 @@ pub async fn login_handler(
 /// Logout handler for POST /admin/logout
 pub async fn logout_handler(session: Session) -> impl Responder {
     session.purge();
-    HttpResponse::Ok().json(crate::handlers::ApiError {
-        error: "Logout successful".to_string(),
-    })
+    HttpResponse::SeeOther()
+        .insert_header(("Location", "/admin/login"))
+        .finish()
 }
 
 /// Middleware to protect admin routes
