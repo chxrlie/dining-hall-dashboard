@@ -176,7 +176,7 @@ endblock %} {% block content %}
             <td>{{ notice.title }}</td>
             <td>{{ notice.content|truncate(length=50) }}</td>
             <td>{% if notice.is_active %}Yes{% else %}No{% endif %}</td>
-            <td>{{ notice.created_at }}</td>
+            <td>{{ notice.created_at | date(format="%Y-%m-%d %H:%M") }}</td>
             <td>
               <button
                 class="btn btn-secondary"
@@ -520,9 +520,90 @@ endblock %} {% block content %}
     }
   }
 
-  function editNotice(id) {
-    // Placeholder for edit functionality
-    alert("Edit functionality for notice " + id + " would open a modal here");
+  async function editNotice(id) {
+    try {
+      // Fetch the notice data
+      const response = await fetch(`/api/notices`);
+      const notices = await response.json();
+      const notice = notices.find((n) => n.id === id);
+
+      if (!notice) {
+        alert("Notice not found");
+        return;
+      }
+
+      // Create and show edit modal
+      const modal = document.createElement("div");
+      modal.className = "modal";
+      modal.innerHTML = `
+        <div class="modal-content">
+          <h3>Edit Notice</h3>
+          <form id="editNoticeForm">
+            <input type="hidden" name="id" value="${notice.id}" />
+            <div class="form-group">
+              <label for="edit-title">Title:</label>
+              <input type="text" id="edit-title" name="title" class="form-control" value="${notice.title}" required />
+            </div>
+            <div class="form-group">
+              <label for="edit-content">Content:</label>
+              <textarea id="edit-content" name="content" class="form-control" required>${notice.content}</textarea>
+            </div>
+            <div class="form-group">
+              <label for="edit-is_active">Active:</label>
+              <input
+                type="checkbox"
+                id="edit-is_active"
+                name="is_active"
+                ${notice.is_active ? "checked" : ""}
+              />
+            </div>
+            <div class="form-actions">
+              <button type="button" class="btn" onclick="closeModal()">Cancel</button>
+              <button type="submit" class="btn btn-primary">Save Changes</button>
+            </div>
+          </form>
+        </div>
+      `;
+
+      document.body.appendChild(modal);
+
+      // Handle form submission
+      document
+        .getElementById("editNoticeForm")
+        .addEventListener("submit", async (e) => {
+          e.preventDefault();
+          const formData = new FormData(e.target);
+          const data = {
+            title: formData.get("title"),
+            content: formData.get("content"),
+            is_active: formData.has("is_active"),
+          };
+
+          try {
+            const updateResponse = await fetch(`/api/notices/${id}`, {
+              method: "PUT",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              credentials: "include",
+              body: JSON.stringify(data),
+            });
+
+            if (updateResponse.ok) {
+              alert("Notice updated successfully");
+              closeModal();
+              location.reload();
+            } else {
+              const error = await updateResponse.json();
+              alert(`Error updating notice: ${error.error}`);
+            }
+          } catch (error) {
+            alert("Error updating notice");
+          }
+        });
+    } catch (error) {
+      alert("Error loading notice data");
+    }
   }
 
   // Handle form submissions with fetch API

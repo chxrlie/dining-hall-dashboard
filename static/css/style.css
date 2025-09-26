@@ -32,7 +32,7 @@
   --color-success-dark: #1b5e20;
   --color-warning: #ef6c00;
   --color-warning-light: #ff9800;
-  --color-warning-dark: #e65100;
+  --color-warning-dark: #d84315;
   --color-error: #c62828;
   --color-error-light: #f44336;
   --color-error-dark: #b71c1c;
@@ -582,7 +582,7 @@ table tr:hover {
 
 .menu-items {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
   gap: var(--spacing-md);
 }
 
@@ -625,7 +625,7 @@ table tr:hover {
 
 .allergens {
   font-size: var(--font-size-xs);
-  color: var(--color-warning);
+  color: var(--color-warning-dark);
   margin-bottom: var(--spacing-xs);
 }
 
@@ -641,7 +641,7 @@ table tr:hover {
 
 /* Notices */
 .notices-section {
-  background: var(--color-info-light);
+  background: var(--color-primary);
   border-radius: var(--border-radius-md);
   padding: var(--spacing-md);
   margin-bottom: var(--spacing-lg);
@@ -649,9 +649,9 @@ table tr:hover {
 }
 
 .notices-section h2 {
-  color: var(--color-info-dark);
+  color: var(--color-accent-light);
   margin-top: 0;
-  border-bottom: 2px solid var(--color-info);
+  border-bottom: 2px solid var(--color-primary-light);
   padding-bottom: var(--spacing-xs);
   margin-bottom: var(--spacing-md);
 }
@@ -669,7 +669,7 @@ table tr:hover {
 }
 
 .notice-item h3 {
-  color: var(--color-info);
+  color: var(--color-info-light);
   margin-top: 0;
   margin-bottom: var(--spacing-xs);
 }
@@ -680,7 +680,7 @@ table tr:hover {
 }
 
 .notice-item small {
-  color: var(--color-neutral-500);
+  color: var(--color-neutral-700);
   font-style: italic;
 }
 

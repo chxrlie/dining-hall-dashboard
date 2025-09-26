@@ -10,8 +10,7 @@
     <div class="notice-item">
       <h3>{{ notice.title }}</h3>
       <p>{{ notice.content }}</p>
-      <small>Posted: {{ notice.created_at | date(format="%B %d, %Y at %I:%M %p") }}</small>
-    </div>
+                  <small>Posted: {{ notice.created_at | date(format="%Y-%m-%d %H:%M") }}</small>    </div>
     {% endfor %}
   </div>
   {% endif %}
